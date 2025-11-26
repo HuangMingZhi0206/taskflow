@@ -128,18 +128,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('TaskFlow'),
         actions: [
           IconButton(
-            icon: Icon(widget.themeService.isDarkMode
-              ? Icons.light_mode
-              : Icons.dark_mode),
-            onPressed: () {
-              widget.themeService.toggleTheme();
-            },
-            tooltip: 'Toggle Theme',
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadTasks,
             tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                '/settings',
+                arguments: widget.user,
+              );
+            },
+            tooltip: 'Settings',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
