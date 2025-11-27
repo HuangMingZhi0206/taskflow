@@ -19,24 +19,26 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
-    // Create users table
+    // Create users table with student support
     await db.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        student_id TEXT UNIQUE,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('manager', 'staff')),
+        role TEXT NOT NULL CHECK(role IN ('manager', 'staff', 'student')),
         avatar_path TEXT,
         position TEXT,
-        contact_number TEXT
+        contact_number TEXT,
+        created_at TEXT
       )
     ''');
 
@@ -139,33 +141,15 @@ class DatabaseHelper {
       )
     ''');
 
-    // Insert demo users
-    await db.insert('users', {
-      'name': 'John Manager',
-      'email': 'manager@taskflow.com',
-      'password': 'manager123',
-      'role': 'manager',
-    });
-
-    await db.insert('users', {
-      'name': 'Jane Staff',
-      'email': 'staff@taskflow.com',
-      'password': 'staff123',
-      'role': 'staff',
-    });
-
-    await db.insert('users', {
-      'name': 'Mike Developer',
-      'email': 'mike@taskflow.com',
-      'password': 'mike123',
-      'role': 'staff',
-    });
-
-    // Insert default tags
-    await db.insert('tags', {'name': 'Bug Fix', 'color': 'ef4444'});
-    await db.insert('tags', {'name': 'Feature', 'color': '3b82f6'});
-    await db.insert('tags', {'name': 'Documentation', 'color': '10b981'});
-    await db.insert('tags', {'name': 'Marketing', 'color': 'f59e0b'});
+    // Insert default academic tags for students
+    await db.insert('tags', {'name': 'Assignment', 'color': '3b82f6'});
+    await db.insert('tags', {'name': 'Exam', 'color': 'ef4444'});
+    await db.insert('tags', {'name': 'Project', 'color': '8b5cf6'});
+    await db.insert('tags', {'name': 'Reading', 'color': '10b981'});
+    await db.insert('tags', {'name': 'Study Group', 'color': 'f59e0b'});
+    await db.insert('tags', {'name': 'Lab', 'color': '06b6d4'});
+    await db.insert('tags', {'name': 'Research', 'color': 'ec4899'});
+    await db.insert('tags', {'name': 'Presentation', 'color': '14b8a6'});
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -251,17 +235,107 @@ class DatabaseHelper {
       await db.insert('tags', {'name': 'Documentation', 'color': '10b981'});
       await db.insert('tags', {'name': 'Marketing', 'color': 'f59e0b'});
     }
+
+    if (oldVersion < 3) {
+      // SQLite doesn't support adding UNIQUE columns via ALTER TABLE
+      // Add columns without UNIQUE constraint
+      await db.execute('ALTER TABLE users ADD COLUMN student_id TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN created_at TEXT');
+
+      // Clear demo users and update default tags for academic use
+      await db.delete('users');
+      await db.delete('tags');
+
+      // Insert academic tags
+      await db.insert('tags', {'name': 'Assignment', 'color': '3b82f6'});
+      await db.insert('tags', {'name': 'Exam', 'color': 'ef4444'});
+      await db.insert('tags', {'name': 'Project', 'color': '8b5cf6'});
+      await db.insert('tags', {'name': 'Reading', 'color': '10b981'});
+      await db.insert('tags', {'name': 'Study Group', 'color': 'f59e0b'});
+      await db.insert('tags', {'name': 'Lab', 'color': '06b6d4'});
+      await db.insert('tags', {'name': 'Research', 'color': 'ec4899'});
+      await db.insert('tags', {'name': 'Presentation', 'color': '14b8a6'});
+    }
+
+    if (oldVersion < 4) {
+      // Fix the CHECK constraint to allow 'student' role
+      // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+
+      // 1. Create new users table with correct CHECK constraint
+      await db.execute('''
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          student_id TEXT UNIQUE,
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          role TEXT NOT NULL CHECK(role IN ('manager', 'staff', 'student')),
+          avatar_path TEXT,
+          position TEXT,
+          contact_number TEXT,
+          created_at TEXT
+        )
+      ''');
+
+      // 2. Copy data from old table to new table
+      await db.execute('''
+        INSERT INTO users_new (id, name, student_id, email, password, role, avatar_path, position, contact_number, created_at)
+        SELECT id, name, student_id, email, password, role, avatar_path, position, contact_number, created_at
+        FROM users
+      ''');
+
+      // 3. Drop old table
+      await db.execute('DROP TABLE users');
+
+      // 4. Rename new table to original name
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+    }
   }
 
   // User operations
-  Future<Map<String, dynamic>?> loginUser(String email, String password) async {
+  Future<Map<String, dynamic>?> loginUser(String emailOrStudentId, String password) async {
+    final db = await database;
+    // Try login with email first
+    var result = await db.query(
+      'users',
+      where: 'email = ? AND password = ?',
+      whereArgs: [emailOrStudentId.toLowerCase(), password],
+    );
+
+    // If not found, try with student ID
+    if (result.isEmpty) {
+      result = await db.query(
+        'users',
+        where: 'student_id = ? AND password = ?',
+        whereArgs: [emailOrStudentId, password],
+      );
+    }
+
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<int> createUser(Map<String, dynamic> user) async {
+    final db = await database;
+    return await db.insert('users', user);
+  }
+
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
     final db = await database;
     final result = await db.query(
       'users',
-      where: 'email = ? AND password = ?',
-      whereArgs: [email, password],
+      where: 'email = ?',
+      whereArgs: [email.toLowerCase()],
     );
+    return result.isNotEmpty ? result.first : null;
+  }
 
+  Future<Map<String, dynamic>?> getUserByStudentId(String studentId) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+    );
     return result.isNotEmpty ? result.first : null;
   }
 

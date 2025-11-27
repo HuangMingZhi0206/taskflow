@@ -612,6 +612,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final formattedDate = DateFormat('MMM dd, yyyy HH:mm').format(reportedAt);
     final commentType = report['comment_type'] ?? 'text';
     final attachmentPath = report['attachment_path'];
+    final reporterName = report['reporter_name'] ?? 'Unknown';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -632,7 +633,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 radius: 16,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                 child: Text(
-                  report['reporter_name'][0].toUpperCase(),
+                  reporterName[0].toUpperCase(),
                   style: const TextStyle(
                     color: AppTheme.primary,
                     fontSize: 12,
@@ -646,7 +647,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      report['reporter_name'],
+                      reporterName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

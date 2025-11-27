@@ -4,6 +4,7 @@ import 'theme/app_theme.dart';
 import 'services/theme_service.dart';
 import 'services/preferences_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/add_task_screen.dart';
 import 'screens/task_detail_screen.dart';
@@ -71,6 +72,11 @@ class _MyAppState extends State<MyApp> {
           case '/':
             return MaterialPageRoute(
               builder: (_) => LoginScreen(themeService: _themeService),
+            );
+
+          case '/register':
+            return MaterialPageRoute(
+              builder: (_) => const RegisterScreen(),
             );
 
           case '/dashboard':

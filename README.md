@@ -1,47 +1,65 @@
-# TaskFlow - Team Task Management Application
+# TaskFlow - Student Academic Productivity Assistant 🎓
 
-A modern, intuitive Flutter mobile application for managing team tasks and tracking progress.
+A modern, intuitive Flutter mobile application designed specifically for **university students** to manage assignments, exams, projects, and study time effectively.
+
+## 🌟 Student Edition - What's New!
+
+TaskFlow has been transformed from a team management tool into a **personal academic assistant** for students:
+
+- ✅ **No Demo Accounts** - Create your own account with Student ID
+- ✅ **Personal Task Management** - All tasks are yours
+- ✅ **Academic Course Tags** - Organize by Assignment, Exam, Project, etc.
+- ✅ **Time Estimation** - Plan your study hours effectively
+- ✅ **Student-Friendly UI** - Encouraging messages and academic focus
 
 ## 📚 Documentation Index
 
-- **[SETUP.md](SETUP.md)** - ⚡ Start here! Step-by-step setup instructions
-- **[QUICKSTART.md](QUICKSTART.md)** - 🚀 Get running in 5 minutes
+### 🎓 Student Resources (START HERE!)
+- **[STUDENT_QUICKSTART.md](STUDENT_QUICKSTART.md)** - 🚀 New students start here!
+- **[STUDENT_VERSION_GUIDE.md](STUDENT_VERSION_GUIDE.md)** - 📖 Complete transformation guide
+
+### 📋 Technical Documentation
+- **[SETUP.md](SETUP.md)** - ⚡ Developer setup instructions
 - **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - 📋 Complete project overview
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - 🏗️ Technical architecture & diagrams
 - **[API.md](API.md)** - 💾 Database API reference
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - 📦 Build & deployment guide
-- **[README.md](README.md)** - 📖 This file - Complete documentation
 
-## ⚡ Quick Start
+## ⚡ Quick Start (Students)
 
 ```bash
-# 1. Install dependencies (in Android Studio or terminal)
+# 1. Install dependencies
 flutter pub get
 
 # 2. Run the app
 flutter run
 
-# 3. Login with demo accounts
-Manager: manager@taskflow.com / manager123
-Staff: staff@taskflow.com / staff123
+# 3. Create your student account
+- Click "Sign Up"
+- Enter your Student ID, Email, and Password
+- Login and start managing your academic life!
 ```
 
 ## 📱 Features
 
-- **Role-Based Authentication**: Separate access for Managers and Staff members
-- **Task Management**: Create, assign, and track tasks with priorities
-- **Status Tracking**: Monitor task progress (To Do, In Progress, Done)
-- **Priority Levels**: Urgent, Medium, and Low priority categorization
-- **Progress Reporting**: Team members can submit progress updates
+### 🎓 Academic Focus
+- **Student Registration**: Create account with Student ID or Email
+- **Personal Tasks**: All tasks auto-assigned to you
+- **Course Tags**: 8 academic tags (Assignment, Exam, Project, Reading, Lab, Research, Presentation, Study Group)
+- **Time Estimation**: Plan study hours for each task
+- **Smart Deadlines**: Calendar picker for due dates
+
+### 📊 Organization
+- **Priority Levels**: Urgent (🔴), Medium (🟡), Low (🟢)
+- **Status Tracking**: To Do, In Progress, Done
+- **Tag-Based Filtering**: Filter tasks by course or type
 - **Real-time Updates**: Pull-to-refresh for latest data
-- **Clean UI**: Modern, minimalist design with intuitive navigation
 
-## 🎨 Design Highlights
-
-- **Color Palette**: Professional indigo primary with semantic colors
-- **Responsive Layouts**: Optimized for various screen sizes
-- **Smooth Navigation**: Intuitive screen transitions
-- **Visual Feedback**: Clear status indicators and loading states
+### 🎨 Student-Friendly Design
+- **Encouraging Messages**: "You got this! 💪"
+- **Clean UI**: Minimalist, distraction-free interface
+- **Color-Coded Tags**: Visual organization by course
+- **Mobile-First**: Optimized for quick task entry
 
 ## 🛠️ Technology Stack
 

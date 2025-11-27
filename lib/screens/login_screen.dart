@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorDialog('Please enter both email and password');
+      _showErrorDialog('Please enter both email/student ID and password');
       return;
     }
 
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           arguments: user,
         );
       } else {
-        _showErrorDialog('Invalid email or password');
+        _showErrorDialog('Invalid credentials. Please check your email/student ID and password.');
       }
     } catch (e) {
       _showErrorDialog('An error occurred: $e');
@@ -73,12 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
-  }
-
-  void _quickLogin(String email, String password) {
-    _emailController.text = email;
-    _passwordController.text = password;
-    _login();
   }
 
   @override
@@ -113,15 +107,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'TaskFlow',
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : AppTheme.textPrimary,
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Team Task Management',
+                  'Student Productivity Hub',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).brightness == Brightness.dark
                             ? AppTheme.darkTextLight
@@ -131,14 +124,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Email Input
+                // Email/Student ID Input
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
+                    labelText: 'Email or Student ID',
+                    prefixIcon: Icon(Icons.person_outline),
+                    hintText: 'Enter your email or student ID',
                   ),
-                  keyboardType: TextInputType.emailAddress,
+                  keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
@@ -187,46 +181,29 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Demo Accounts Section
+                // Registration Section
                 const Divider(),
                 const SizedBox(height: 16),
-                Text(
-                  'Quick Login (Demo Accounts)',
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
 
-                // Manager Quick Login
-                OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _quickLogin(
-                            'manager@taskflow.com',
-                            'manager123',
+                // Register Button
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/register');
+                  },
+                  child: Text.rich(
+                    TextSpan(
+                      text: "Don't have an account? ",
+                      style: const TextStyle(color: AppTheme.textLight),
+                      children: const [
+                        TextSpan(
+                          text: 'Sign Up',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold,
                           ),
-                  icon: const Icon(Icons.admin_panel_settings),
-                  label: const Text('Login as Manager'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: AppTheme.primary),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Staff Quick Login
-                OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _quickLogin(
-                            'staff@taskflow.com',
-                            'staff123',
-                          ),
-                  icon: const Icon(Icons.person),
-                  label: const Text('Login as Staff'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: AppTheme.secondary),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

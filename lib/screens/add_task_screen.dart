@@ -20,16 +20,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   String _selectedPriority = 'medium';
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 7));
-  int? _selectedAssigneeId;
-  String? _selectedAssigneeName;
+  final List<int> _selectedTags = [];
+  List<Map<String, dynamic>> _allTags = [];
 
-  List<Map<String, dynamic>> _staffUsers = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadStaffUsers();
+    _loadTags();
   }
 
   @override
@@ -40,14 +39,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     super.dispose();
   }
 
-  Future<void> _loadStaffUsers() async {
+  Future<void> _loadTags() async {
     try {
-      final users = await DatabaseHelper.instance.getStaffUsers();
+      final tags = await DatabaseHelper.instance.getAllTags();
       setState(() {
-        _staffUsers = users;
+        _allTags = tags;
       });
     } catch (e) {
-      _showErrorDialog('Error loading staff users: $e');
+      _showErrorDialog('Error loading tags: $e');
     }
   }
 
@@ -87,19 +86,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       return;
     }
 
-    if (_selectedAssigneeId == null) {
-      _showErrorDialog('Please select a team member to assign this task');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
       final task = {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'assignee_name': _selectedAssigneeName!,
-        'assignee_id': _selectedAssigneeId!,
+        'assignee_name': widget.user['name'],
+        'assignee_id': widget.user['id'],
         'priority': _selectedPriority,
         'status': 'todo',
         'deadline': _selectedDeadline.toIso8601String(),
@@ -110,12 +104,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             : null,
       };
 
-      await DatabaseHelper.instance.createTask(task);
+      final taskId = await DatabaseHelper.instance.createTask(task);
+
+      // Add selected tags to the task
+      for (final tagId in _selectedTags) {
+        await DatabaseHelper.instance.addTaskTag(taskId, tagId);
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task created successfully')),
+        const SnackBar(
+          content: Text('✅ Task created! You got this! 💪'),
+          backgroundColor: Colors.green,
+        ),
       );
 
       Navigator.pop(context, true);
@@ -250,16 +252,25 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Assignee Selection
+            // Course/Category Tags
             Text(
-              'Assign To',
+              'Course Tags (Optional)',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-            if (_staffUsers.isEmpty)
-              const Center(child: CircularProgressIndicator())
+            if (_allTags.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No tags available'),
+                ),
+              )
             else
-              ..._staffUsers.map((user) => _buildAssigneeCard(user)),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _allTags.map((tag) => _buildTagChip(tag)).toList(),
+              ),
             const SizedBox(height: 32),
 
             // Create Button
@@ -284,6 +295,36 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTagChip(Map<String, dynamic> tag) {
+    final isSelected = _selectedTags.contains(tag['id']);
+    final color = Color(int.parse('0xff${tag['color']}'));
+
+    return FilterChip(
+      label: Text(tag['name']),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedTags.add(tag['id']);
+          } else {
+            _selectedTags.remove(tag['id']);
+          }
+        });
+      },
+      backgroundColor: Colors.white,
+      selectedColor: color.withValues(alpha: 0.2),
+      checkmarkColor: color,
+      labelStyle: TextStyle(
+        color: isSelected ? color : AppTheme.textPrimary,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+      side: BorderSide(
+        color: isSelected ? color : AppTheme.textLight.withValues(alpha: 0.3),
+        width: isSelected ? 2 : 1,
       ),
     );
   }
@@ -348,75 +389,6 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       default:
         return Icons.info;
     }
-  }
-
-  Widget _buildAssigneeCard(Map<String, dynamic> user) {
-    final isSelected = _selectedAssigneeId == user['id'];
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedAssigneeId = user['id'];
-            _selectedAssigneeName = user['name'];
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? AppTheme.primary
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                child: Text(
-                  user['name'][0].toUpperCase(),
-                  style: const TextStyle(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user['name'],
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      user['email'],
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check_circle,
-                  color: AppTheme.primary,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
