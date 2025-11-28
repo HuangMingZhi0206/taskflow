@@ -26,7 +26,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final courses = await CourseService.instance.getUserCourses(widget.user['id']);
+      final courses = await CourseService.instance.getUserCourses(widget.user['id'].toString());
       setState(() {
         _courses = courses;
         _isLoading = false;
@@ -319,8 +319,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 }
 
                 try {
+                  print('User ID from widget: ${widget.user['id']} (type: ${widget.user['id'].runtimeType})');
+
                   await CourseService.instance.createCourse(
-                    userId: widget.user['id'],
+                    userId: widget.user['id'].toString(), // Ensure string conversion
                     courseCode: courseCodeController.text.trim(),
                     courseName: courseNameController.text.trim(),
                     instructor: instructorController.text.trim().isEmpty
@@ -338,6 +340,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     const SnackBar(content: Text('✅ Course added!')),
                   );
                 } catch (e) {
+                  print('Error creating course: $e');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error: $e')),
                   );
@@ -462,7 +465,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 try {
                   await CourseService.instance.addClassSchedule(
                     courseId: course.id,
-                    userId: widget.user['id'],
+                    userId: widget.user['id'].toString(), // Ensure string conversion
                     dayOfWeek: selectedDay!,
                     startTime: '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}',
                     endTime: '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}',

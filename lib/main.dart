@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'config/app_config.dart';
 import 'database/database_helper.dart';
 import 'database/sqlite_database_helper.dart';
@@ -14,6 +16,7 @@ import 'screens/settings_screen.dart';
 import 'screens/courses_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/groups_screen.dart';
+import 'screens/group_activities_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,17 +26,34 @@ void main() async {
 
   // RESET DATABASE (Enable only if you need fresh start)
   // This will delete the old database and create a new one with correct schema
-  print('⚠️  Resetting database...');
-  await SQLiteDatabaseHelper.instance.deleteDatabase();
-  print('✓ Database reset complete');
-
-  // Initialize database
+  print('⚠️  Resetting database for courses table fix...');
   try {
-    await DatabaseHelper.instance.database;
-    print('✓ Database initialized successfully');
+    // Delete using DatabaseHelper to ensure we're deleting the right database
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'taskflow.db');
+    await deleteDatabase(path);
+    print('✓ Database deleted successfully');
+  } catch (e) {
+    print('⚠️  Database delete error (might not exist): $e');
+  }
+
+  // Initialize database - this will create version 5 with courses table
+  try {
+    final db = await DatabaseHelper.instance.database;
+    print('✓ Database initialized successfully with version 5');
+
+    // Verify courses table exists
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='courses'"
+    );
+    if (tables.isNotEmpty) {
+      print('✅ VERIFIED: courses table exists!');
+    } else {
+      print('❌ ERROR: courses table NOT found!');
+    }
   } catch (e) {
     print('✗ Error initializing database: $e');
-    print('💡 Try clearing app data or enable database reset above');
+    print('💡 Try clearing app data manually');
   }
 
   runApp(const MyApp());
@@ -131,6 +151,24 @@ class _MyAppState extends State<MyApp> {
                 themeService: _themeService,
                 preferencesService: _preferencesService,
               ),
+            );
+
+          case '/schedule':
+            final user = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => ScheduleScreen(user: user),
+            );
+
+          case '/courses':
+            final user = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => CoursesScreen(user: user),
+            );
+
+          case '/groups':
+            final user = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => GroupActivitiesScreen(user: user),
             );
 
           default:

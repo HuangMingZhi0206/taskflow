@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,  // Increased to 5 to include courses table
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -141,6 +141,25 @@ class DatabaseHelper {
       )
     ''');
 
+    // Create courses table for student course management
+    await db.execute('''
+      CREATE TABLE courses (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        course_code TEXT NOT NULL,
+        course_name TEXT NOT NULL,
+        lecturer TEXT,
+        room TEXT,
+        day_of_week INTEGER NOT NULL DEFAULT 0,
+        start_time TEXT NOT NULL DEFAULT '00:00',
+        end_time TEXT NOT NULL DEFAULT '00:00',
+        color TEXT NOT NULL DEFAULT '3b82f6',
+        semester TEXT,
+        credits INTEGER
+      )
+    ''');
+    print('✓ Created courses table in DatabaseHelper');
+
     // Insert default academic tags for students
     await db.insert('tags', {'name': 'Assignment', 'color': '3b82f6'});
     await db.insert('tags', {'name': 'Exam', 'color': 'ef4444'});
@@ -182,6 +201,28 @@ class DatabaseHelper {
 
       // Note: Complex migrations like RENAME are skipped if already done
       // The app will work with the current schema
+    }
+
+    if (oldVersion < 5) {
+      // Version 5: Add courses table for student course management
+      print('📚 Adding courses table...');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS courses (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          course_code TEXT NOT NULL,
+          course_name TEXT NOT NULL,
+          lecturer TEXT,
+          room TEXT,
+          day_of_week INTEGER NOT NULL DEFAULT 0,
+          start_time TEXT NOT NULL DEFAULT '00:00',
+          end_time TEXT NOT NULL DEFAULT '00:00',
+          color TEXT NOT NULL DEFAULT '3b82f6',
+          semester TEXT,
+          credits INTEGER
+        )
+      ''');
+      print('✓ Courses table created successfully');
     }
   }
 

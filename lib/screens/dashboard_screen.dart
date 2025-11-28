@@ -70,6 +70,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  String _getRoleDisplay() {
+    switch (widget.user['role']) {
+      case 'student':
+        return widget.user['student_id'] != null
+          ? '🎓 Student ID: ${widget.user['student_id']}'
+          : '🎓 Student';
+      case 'manager':
+        return '👔 Manager';
+      case 'staff':
+        return '👤 Staff Member';
+      default:
+        return '🎓 Student';
+    }
+  }
+
+  Widget _buildStatChip(String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.white70,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -158,46 +241,165 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: AppTheme.primary,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Welcome, ${widget.user['name']}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.school, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome, ${widget.user['name']}! 👋',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getRoleDisplay(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.user['role'] == 'manager' ? 'Manager' : 'Staff Member',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
+                const SizedBox(height: 16),
+                // Task Stats
+                Row(
+                  children: [
+                    _buildStatChip(
+                      '📋 ${_tasks.length}',
+                      'Total Tasks',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildStatChip(
+                      '⏳ ${_tasks.where((t) => t['status'] != 'done').length}',
+                      'Pending',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildStatChip(
+                      '✅ ${_tasks.where((t) => t['status'] == 'done').length}',
+                      'Completed',
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
+          // Quick Access Menu
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Quick Access',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildQuickAccessCard(
+                      icon: Icons.calendar_month,
+                      label: 'Schedule',
+                      color: Colors.blue,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/schedule',
+                        arguments: widget.user,
+                      ),
+                    ),
+                    _buildQuickAccessCard(
+                      icon: Icons.menu_book,
+                      label: 'Courses',
+                      color: Colors.green,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/courses',
+                        arguments: widget.user,
+                      ),
+                    ),
+                    _buildQuickAccessCard(
+                      icon: Icons.groups,
+                      label: 'Groups',
+                      color: Colors.orange,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/groups',
+                        arguments: widget.user,
+                      ),
+                    ),
+                    _buildQuickAccessCard(
+                      icon: Icons.settings,
+                      label: 'Settings',
+                      color: Colors.purple,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/settings',
+                        arguments: widget.user,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
           // Filter Chips
           Container(
             padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('To Do', 'todo'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('In Progress', 'in-progress'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Done', 'done'),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Tasks',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('All', 'all'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('To Do', 'todo'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('In Progress', 'in-progress'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Done', 'done'),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -220,22 +422,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      floatingActionButton: widget.user['role'] == 'manager'
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                final result = await Navigator.pushNamed(
-                  context,
-                  '/add-task',
-                  arguments: widget.user,
-                );
-                if (result == true) {
-                  _loadTasks();
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Task'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.pushNamed(
+            context,
+            '/add-task',
+            arguments: widget.user,
+          );
+          if (result == true) {
+            _loadTasks();
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Task'),
+        backgroundColor: AppTheme.primary,
+      ),
     );
   }
 
@@ -395,33 +596,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEmptyState() {
+    String message, submessage;
+    IconData icon;
+
+    switch (_selectedFilter) {
+      case 'todo':
+        icon = Icons.check_circle_outline;
+        message = 'No pending tasks! 🎉';
+        submessage = "You're all caught up!";
+        break;
+      case 'in-progress':
+        icon = Icons.hourglass_empty;
+        message = 'No tasks in progress';
+        submessage = 'Start working on a task to see it here';
+        break;
+      case 'done':
+        icon = Icons.task_alt;
+        message = 'No completed tasks yet';
+        submessage = 'Complete tasks to see them here';
+        break;
+      default:
+        icon = Icons.add_task;
+        message = 'No tasks yet! 📚';
+        submessage = 'Tap the + button below to create your first task';
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.task_outlined,
-            size: 64,
+            icon,
+            size: 80,
             color: AppTheme.textLight,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
-            'No tasks found',
-            style: TextStyle(
-              fontSize: 18,
-              color: AppTheme.textLight,
-              fontWeight: FontWeight.w500,
+            message,
+            style: const TextStyle(
+              fontSize: 20,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            _selectedFilter == 'all'
-                ? 'Tasks will appear here'
-                : 'No tasks with this status',
+            submessage,
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.textLight,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

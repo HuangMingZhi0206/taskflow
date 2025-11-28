@@ -28,18 +28,21 @@ class SQLiteDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,  // Increased version to trigger upgrade
+      version: 3,  // Increased version to 3 to include courses table
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    print('📊 Upgrading database from version $oldVersion to $newVersion');
+
     // Upgrade from version 1 to 2: Add role and position columns
     if (oldVersion < 2) {
       try {
         // Add role column with default value
         await db.execute('ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT "student"');
+        print('✓ Added role column to users table');
       } catch (e) {
         print('Column role might already exist: $e');
       }
@@ -47,13 +50,22 @@ class SQLiteDatabaseHelper {
       try {
         // Add position column (optional, for staff)
         await db.execute('ALTER TABLE users ADD COLUMN position TEXT');
+        print('✓ Added position column to users table');
       } catch (e) {
         print('Column position might already exist: $e');
       }
     }
+
+    // Upgrade from version 2 to 3: No schema changes, just version bump
+    // All tables already exist in _createDB
+    if (oldVersion < 3) {
+      print('✓ Upgraded to version 3 (no schema changes needed)');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
+    print('📦 Creating database version $version with all tables...');
+
     // Users table - Support all user types
     await db.execute('''
       CREATE TABLE users(
@@ -71,6 +83,7 @@ class SQLiteDatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+    print('✓ Created users table');
 
     // Tasks table - Personal tasks for students
     await db.execute('''
@@ -89,6 +102,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     ''');
+    print('✓ Created tasks table');
 
     // Courses table - Schedule courses
     await db.execute('''
@@ -108,6 +122,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     ''');
+    print('✓ Created courses table');
 
     // Group Activities table
     await db.execute('''
@@ -124,6 +139,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (created_by) REFERENCES users (id)
       )
     ''');
+    print('✓ Created group_activities table');
 
     // Group Members table
     await db.execute('''
@@ -137,6 +153,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     ''');
+    print('✓ Created group_members table');
 
     // Study Sessions table - Pomodoro tracking
     await db.execute('''
@@ -154,6 +171,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (task_id) REFERENCES tasks (id)
       )
     ''');
+    print('✓ Created study_sessions table');
 
     // Subtasks table
     await db.execute('''
@@ -166,6 +184,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
       )
     ''');
+    print('✓ Created subtasks table');
 
     // Comments table
     await db.execute('''
@@ -181,6 +200,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (reported_by) REFERENCES users (id)
       )
     ''');
+    print('✓ Created comments table');
 
     // Tags table
     await db.execute('''
@@ -190,6 +210,7 @@ class SQLiteDatabaseHelper {
         color TEXT NOT NULL
       )
     ''');
+    print('✓ Created tags table');
 
     // Task_Tags junction table
     await db.execute('''
@@ -201,6 +222,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
       )
     ''');
+    print('✓ Created task_tags table');
 
     // Notifications table
     await db.execute('''
@@ -217,6 +239,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
       )
     ''');
+    print('✓ Created notifications table');
 
     // Activity logs table
     await db.execute('''
@@ -232,6 +255,7 @@ class SQLiteDatabaseHelper {
         FOREIGN KEY (performed_by) REFERENCES users (id)
       )
     ''');
+    print('✓ Created activity_logs table');
 
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_tasks_user ON tasks(user_id)');
@@ -241,6 +265,9 @@ class SQLiteDatabaseHelper {
     await db.execute('CREATE INDEX idx_subtasks_task ON subtasks(task_id)');
     await db.execute('CREATE INDEX idx_notifications_user ON notifications(user_id)');
     await db.execute('CREATE INDEX idx_activity_logs_task ON activity_logs(task_id)');
+    print('✓ Created database indexes');
+
+    print('✅ Database creation complete! All tables created successfully.');
   }
 
   // ==================== USER OPERATIONS ====================

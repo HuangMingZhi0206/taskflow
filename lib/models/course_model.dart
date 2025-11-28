@@ -11,6 +11,8 @@ class CourseModel {
   final String color; // Hex color code for visual distinction
   final String? room;
   final String? description;
+  final String? semester;
+  final int? credits;
   final DateTime createdAt;
   final bool isActive;
 
@@ -23,45 +25,11 @@ class CourseModel {
     this.color = '3b82f6', // Default blue
     this.room,
     this.description,
+    this.semester,
+    this.credits,
     required this.createdAt,
     this.isActive = true,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory CourseModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return CourseModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      courseCode: data['courseCode'] ?? '',
-      courseName: data['courseName'] ?? '',
-      instructor: data['instructor'],
-      color: data['color'] ?? '3b82f6',
-      room: data['room'],
-      description: data['description'],
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      isActive: data['isActive'] ?? true,
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'userId': userId,
-      'courseCode': courseCode,
-      'courseName': courseName,
-      'instructor': instructor,
-      'color': color,
-      'room': room,
-      'description': description,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'isActive': isActive,
-    };
-  }
-  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -69,13 +37,36 @@ class CourseModel {
       'user_id': userId,
       'course_code': courseCode,
       'course_name': courseName,
-      'instructor': instructor,
+      'lecturer': instructor,
       'color': color,
       'room': room,
       'description': description,
+      'semester': semester,
+      'credits': credits,
       'created_at': createdAt.toIso8601String(),
-      'is_active': isActive,
+      'is_active': isActive ? 1 : 0,
     };
+  }
+
+  factory CourseModel.fromMap(Map<String, dynamic> map) {
+    return CourseModel(
+      id: map['id']?.toString() ?? '',
+      userId: map['user_id']?.toString() ?? '',
+      courseCode: map['course_code']?.toString() ?? '',
+      courseName: map['course_name']?.toString() ?? '',
+      instructor: map['lecturer']?.toString(),
+      color: map['color']?.toString() ?? '3b82f6',
+      room: map['room']?.toString(),
+      description: map['description']?.toString(),
+      semester: map['semester']?.toString(),
+      credits: map['credits'] is int
+          ? map['credits']
+          : (int.tryParse(map['credits']?.toString() ?? '')),
+      createdAt: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      isActive: map['is_active'] == 1 || map['is_active'] == true,
+    );
   }
 }
 
@@ -144,6 +135,45 @@ class ClassScheduleModel {
       'sunday': 7,
     };
     return days[dayOfWeek.toLowerCase()] ?? 1;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'course_id': courseId,
+      'user_id': userId,
+      'day_of_week': dayOfWeek,
+      'start_time': startTime,
+      'end_time': endTime,
+      'room': room,
+      'is_active': isActive ? 1 : 0,
+    };
+  }
+
+  factory ClassScheduleModel.fromMap(Map<String, dynamic> map) {
+    // Convert day number to day name
+    final dayNumber = map['day_of_week'];
+    String dayName = 'monday';
+
+    if (dayNumber is int) {
+      const dayNames = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      if (dayNumber >= 1 && dayNumber <= 7) {
+        dayName = dayNames[dayNumber];
+      }
+    } else if (dayNumber is String) {
+      dayName = dayNumber.toLowerCase();
+    }
+
+    return ClassScheduleModel(
+      id: map['id']?.toString() ?? '',
+      courseId: map['course_id']?.toString() ?? map['id']?.toString() ?? '',
+      userId: map['user_id']?.toString() ?? '',
+      dayOfWeek: dayName,
+      startTime: map['start_time']?.toString() ?? '00:00',
+      endTime: map['end_time']?.toString() ?? '00:00',
+      room: map['room']?.toString(),
+      isActive: map['is_active'] == 1 || map['is_active'] == true,
+    );
   }
 }
 
