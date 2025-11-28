@@ -22,12 +22,10 @@ void main() async {
   AppConfig.printConfig();
 
   // RESET DATABASE (Enable only if you need fresh start)
-  // Uncomment the lines below to delete database and start fresh
-  /*
+  // This will delete the old database and create a new one with correct schema
   print('⚠️  Resetting database...');
   await SQLiteDatabaseHelper.instance.deleteDatabase();
   print('✓ Database reset complete');
-  */
 
   // Initialize database
   try {

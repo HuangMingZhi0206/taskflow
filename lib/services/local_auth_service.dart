@@ -59,6 +59,7 @@ class LocalAuthService {
         'name': name,
         'email': email,
         'password': _hashPassword(password),
+        'role': 'student', // Default role for registerUser
         'student_id': studentId,
         'major': major,
         'semester': semester,

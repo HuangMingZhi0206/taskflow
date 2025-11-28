@@ -28,24 +28,46 @@ class SQLiteDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,  // Increased version to trigger upgrade
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // Upgrade from version 1 to 2: Add role and position columns
+    if (oldVersion < 2) {
+      try {
+        // Add role column with default value
+        await db.execute('ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT "student"');
+      } catch (e) {
+        print('Column role might already exist: $e');
+      }
+
+      try {
+        // Add position column (optional, for staff)
+        await db.execute('ALTER TABLE users ADD COLUMN position TEXT');
+      } catch (e) {
+        print('Column position might already exist: $e');
+      }
+    }
+  }
+
   Future<void> _createDB(Database db, int version) async {
-    // Users table - All users are students
+    // Users table - Support all user types
     await db.execute('''
       CREATE TABLE users(
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        student_id TEXT UNIQUE NOT NULL,
+        role TEXT NOT NULL DEFAULT 'student',
+        student_id TEXT UNIQUE,
         major TEXT,
         semester INTEGER,
         contact_number TEXT,
         avatar_url TEXT,
+        position TEXT,
         created_at TEXT NOT NULL
       )
     ''');
