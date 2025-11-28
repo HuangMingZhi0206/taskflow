@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Firebase disabled - using SQLite only
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
   final String id;
@@ -27,6 +28,8 @@ class UserModel {
     required this.createdAt,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   // Convert Firestore document to UserModel
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
@@ -44,7 +47,10 @@ class UserModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   // Convert UserModel to Firestore document
   Map<String, dynamic> toFirestore() {
     return {
@@ -58,6 +64,7 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
+  */
 
   // Convert to Map (for compatibility with existing code)
   Map<String, dynamic> toMap() {

@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Firebase disabled - using SQLite only
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TaskModel {
   final String id;
@@ -31,6 +32,8 @@ class TaskModel {
     this.tagIds = const [],
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory TaskModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return TaskModel(
@@ -49,7 +52,10 @@ class TaskModel {
       tagIds: List<String>.from(data['tagIds'] ?? []),
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,
@@ -66,6 +72,7 @@ class TaskModel {
       'tagIds': tagIds,
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -96,6 +103,8 @@ class TagModel {
     required this.color,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory TagModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return TagModel(
@@ -104,13 +113,17 @@ class TagModel {
       color: data['color'] ?? '3b82f6',
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
       'color': color,
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -136,6 +149,8 @@ class SubtaskModel {
     required this.createdAt,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory SubtaskModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return SubtaskModel(
@@ -146,7 +161,10 @@ class SubtaskModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'taskId': taskId,
@@ -155,6 +173,7 @@ class SubtaskModel {
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -186,6 +205,8 @@ class CommentModel {
     this.attachmentUrl,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory CommentModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return CommentModel(
@@ -198,7 +219,10 @@ class CommentModel {
       attachmentUrl: data['attachmentUrl'],
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'taskId': taskId,
@@ -209,6 +233,7 @@ class CommentModel {
       'attachmentUrl': attachmentUrl,
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -244,6 +269,8 @@ class NotificationModel {
     required this.createdAt,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory NotificationModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return NotificationModel(
@@ -257,7 +284,10 @@ class NotificationModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
@@ -269,6 +299,7 @@ class NotificationModel {
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
