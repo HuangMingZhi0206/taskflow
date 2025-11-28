@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'config/app_config.dart';
 import 'database/database_helper.dart';
+import 'database/sqlite_database_helper.dart';
 import 'theme/app_theme.dart';
 import 'services/theme_service.dart';
 import 'services/preferences_service.dart';
@@ -9,12 +11,32 @@ import 'screens/dashboard_screen.dart';
 import 'screens/add_task_screen.dart';
 import 'screens/task_detail_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/courses_screen.dart';
+import 'screens/schedule_screen.dart';
+import 'screens/groups_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Print app configuration
+  AppConfig.printConfig();
+
+  // RESET DATABASE (Enable only if you need fresh start)
+  // Uncomment the lines below to delete database and start fresh
+  /*
+  print('⚠️  Resetting database...');
+  await SQLiteDatabaseHelper.instance.deleteDatabase();
+  print('✓ Database reset complete');
+  */
+
   // Initialize database
-  await DatabaseHelper.instance.database;
+  try {
+    await DatabaseHelper.instance.database;
+    print('✓ Database initialized successfully');
+  } catch (e) {
+    print('✗ Error initializing database: $e');
+    print('💡 Try clearing app data or enable database reset above');
+  }
 
   runApp(const MyApp());
 }

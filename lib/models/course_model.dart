@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Firebase disabled - using SQLite only
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Course Model - Represents a university course/class
 class CourseModel {
@@ -26,6 +27,8 @@ class CourseModel {
     this.isActive = true,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory CourseModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return CourseModel(
@@ -41,7 +44,10 @@ class CourseModel {
       isActive: data['isActive'] ?? true,
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
@@ -55,6 +61,7 @@ class CourseModel {
       'isActive': isActive,
     };
   }
+  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -94,6 +101,8 @@ class ClassScheduleModel {
     this.isActive = true,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory ClassScheduleModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return ClassScheduleModel(
@@ -107,7 +116,10 @@ class ClassScheduleModel {
       isActive: data['isActive'] ?? true,
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'courseId': courseId,
@@ -119,6 +131,7 @@ class ClassScheduleModel {
       'isActive': isActive,
     };
   }
+  */
 
   int get dayIndex {
     const days = {
@@ -158,6 +171,8 @@ class StudySessionModel {
     this.notes,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory StudySessionModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return StudySessionModel(
@@ -174,7 +189,10 @@ class StudySessionModel {
       notes: data['notes'],
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
@@ -187,5 +205,6 @@ class StudySessionModel {
       'notes': notes,
     };
   }
+  */
 }
 

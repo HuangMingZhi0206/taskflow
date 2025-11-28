@@ -1,6 +1,7 @@
 /// Group/Study Group Model for collaborative activities
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Firebase disabled - using SQLite only
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GroupModel {
   final String id;
@@ -27,6 +28,8 @@ class GroupModel {
     this.memberIds = const [],
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory GroupModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return GroupModel(
@@ -44,7 +47,10 @@ class GroupModel {
       memberIds: List<String>.from(data['memberIds'] ?? []),
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'groupName': groupName,
@@ -58,6 +64,7 @@ class GroupModel {
       'memberIds': memberIds,
     };
   }
+  */
 
   factory GroupModel.fromMap(Map<String, dynamic> map) {
     return GroupModel(
@@ -117,6 +124,8 @@ class GroupTaskModel {
     required this.createdBy,
   });
 
+  // Firebase disabled - fromFirestore method commented out
+  /*
   factory GroupTaskModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return GroupTaskModel(
@@ -133,7 +142,10 @@ class GroupTaskModel {
       createdBy: data['createdBy'] ?? '',
     );
   }
+  */
 
+  // Firebase disabled - toFirestore method commented out
+  /*
   Map<String, dynamic> toFirestore() {
     return {
       'groupId': groupId,
@@ -148,5 +160,6 @@ class GroupTaskModel {
       'createdBy': createdBy,
     };
   }
+  */
 }
 
