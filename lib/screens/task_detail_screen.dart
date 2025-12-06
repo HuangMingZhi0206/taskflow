@@ -1,63 +1,36 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
-import '../database/database_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as path;
 import '../theme/app_theme.dart';
 
 class TaskDetailScreen extends StatefulWidget {
-  final int taskId;
+  final String taskId;
   final Map<String, dynamic> user;
 
-  const TaskDetailScreen({
-    super.key,
-    required this.taskId,
-    required this.user,
-  });
+  const TaskDetailScreen({super.key, required this.taskId, required this.user});
 
   @override
   State<TaskDetailScreen> createState() => _TaskDetailScreenState();
 }
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
-  Map<String, dynamic>? _task;
-  List<Map<String, dynamic>> _reports = [];
   final _reportController = TextEditingController();
   final _linkController = TextEditingController();
-  bool _isLoading = true;
   bool _isSubmittingReport = false;
   String _commentType = 'text'; // text, file, link
   String? _selectedFilePath;
   String? _selectedFileName;
 
   @override
-  void initState() {
-    super.initState();
-    _loadTaskDetails();
-  }
-
-  @override
   void dispose() {
     _reportController.dispose();
     _linkController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadTaskDetails() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final task = await DatabaseHelper.instance.getTaskById(widget.taskId);
-      final reports = await DatabaseHelper.instance.getTaskComments(widget.taskId);
-
-      setState(() {
-        _task = task;
-        _reports = reports;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorDialog('Error loading task details: $e');
-    }
   }
 
   void _showErrorDialog(String message) {
@@ -76,32 +49,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Future<void> _updateStatus(String newStatus) async {
-    // If trying to complete task, check if staff has uploaded file or link
-    if (newStatus == 'done') {
-      // Check if there are any file or link comments
-      final hasFileOrLink = _reports.any((report) =>
-        report['comment_type'] == 'file' || report['comment_type'] == 'link'
-      );
-
-      if (!hasFileOrLink) {
-        _showErrorDialog(
-          'You must upload a file or share a link before completing this task.\n\n'
-          'Please add:\n'
-          '• 📎 A file attachment (document, image, etc.), or\n'
-          '• 🔗 A relevant link\n\n'
-          'Then try completing the task again.'
-        );
-        return;
-      }
-    }
-
+  Future<void> _updateStatus(
+    String newStatus,
+    List<Map<String, dynamic>> reports,
+  ) async {
+    
     try {
-      await DatabaseHelper.instance.updateTaskStatus(widget.taskId, newStatus);
-      _loadTaskDetails();
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.taskId)
+          .update({'status': newStatus});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status updated to ${AppTheme.getStatusLabel(newStatus)}')),
+          SnackBar(
+            content: Text(
+              'Status updated to ${AppTheme.getStatusLabel(newStatus)}',
+            ),
+            backgroundColor: AppTheme.secondary,
+          ),
         );
       }
     } catch (e) {
@@ -113,7 +78,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'xlsx', 'xls'],
+        allowedExtensions: [
+          'pdf',
+          'doc',
+          'docx',
+          'txt',
+          'jpg',
+          'jpeg',
+          'png',
+          'xlsx',
+          'xls',
+        ],
       );
 
       if (result != null) {
@@ -137,6 +112,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _submitReport() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      _showErrorDialog('You must be logged in to comment.');
+      return;
+    }
+
     final commentText = _reportController.text.trim();
     final linkUrl = _linkController.text.trim();
 
@@ -148,24 +129,47 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     setState(() => _isSubmittingReport = true);
 
     try {
+      String? attachmentUrl;
+      if (_selectedFilePath != null) {
+        final fileName =
+            '${currentUser.uid}-${DateTime.now().millisecondsSinceEpoch}-${path.basename(_selectedFilePath!)}';
+        final ref = FirebaseStorage.instance.ref(
+          'task_attachments/${widget.taskId}/$fileName',
+        );
+        final uploadTask = await ref.putFile(File(_selectedFilePath!));
+        attachmentUrl = await uploadTask.ref.getDownloadURL();
+      }
+
       final report = {
-        'task_id': widget.taskId,
-        'comment_text': commentText.isNotEmpty ? commentText : (_commentType == 'file' ? 'Attached: $_selectedFileName' : 'Link: $linkUrl'),
-        'reported_by': widget.user['id'],
-        'reported_at': DateTime.now().toIso8601String(),
+        'comment_text': commentText.isNotEmpty
+            ? commentText
+            : (_commentType == 'file'
+                  ? 'Attached: $_selectedFileName'
+                  : 'Link: $linkUrl'),
+        'reported_by': currentUser.uid,
+        'reporter_name': widget.user['name'] ?? 'Anonymous',
+        'reported_at': FieldValue.serverTimestamp(),
         'comment_type': _commentType,
-        'attachment_path': _selectedFilePath ?? (_commentType == 'link' ? linkUrl : null),
+        'attachment_path':
+            attachmentUrl ?? (_commentType == 'link' ? linkUrl : null),
       };
 
-      await DatabaseHelper.instance.addTaskComment(report);
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.taskId)
+          .collection('comments')
+          .add(report);
+
       _reportController.clear();
       _linkController.clear();
       _clearAttachment();
-      _loadTaskDetails();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comment submitted successfully')),
+          const SnackBar(
+            content: Text('Comment submitted successfully'),
+            backgroundColor: AppTheme.secondary,
+          ),
         );
       }
     } catch (e) {
@@ -177,367 +181,621 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Task Details')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (_task == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Task Details')),
-        body: const Center(child: Text('Task not found')),
-      );
-    }
-
-    final priorityColor = AppTheme.getPriorityColor(_task!['priority']);
-    final statusColor = AppTheme.getStatusColor(_task!['status']);
-    final deadline = DateTime.parse(_task!['deadline']);
-    final createdAt = DateTime.parse(_task!['created_at']);
-    final isAssignee = widget.user['id'] == _task!['assignee_id'];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Task Details'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Task Info Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: priorityColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: priorityColor),
-                        ),
-                        child: Text(
-                          _task!['priority'].toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: priorityColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: statusColor),
-                        ),
-                        child: Text(
-                          AppTheme.getStatusLabel(_task!['status']),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _task!['title'],
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _task!['description'],
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  _buildInfoRow(
-                    Icons.person_outline,
-                    'Assigned To',
-                    _task!['assignee_name'],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    Icons.calendar_today_outlined,
-                    'Deadline',
-                    DateFormat('MMMM dd, yyyy').format(deadline),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    Icons.access_time,
-                    'Created',
-                    DateFormat('MMM dd, yyyy').format(createdAt),
-                  ),
-                ],
-              ),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.taskId)
+          .snapshots(),
+      builder: (context, taskSnapshot) {
+        if (taskSnapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Task Details'),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
             ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (!taskSnapshot.hasData || taskSnapshot.data!.data() == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Task Details'),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
+            body: const Center(child: Text('Task not found')),
+          );
+        }
+
+        final task = taskSnapshot.data!.data()!;
+        final priorityColor = AppTheme.getPriorityColor(task['priority']);
+        final statusColor = AppTheme.getStatusColor(task['status']);
+        final deadline = (task['deadline'] as Timestamp).toDate();
+        final createdAt = (task['created_at'] as Timestamp).toDate();
+        final isAssignee = widget.user['id'] == task['userId'];
+
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: const Text(
+              'Task Details',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            centerTitle: true,
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
           ),
-          const SizedBox(height: 16),
+          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('tasks')
+                .doc(widget.taskId)
+                .collection('comments')
+                .orderBy('reported_at', descending: true)
+                .snapshots(),
+            builder: (context, commentSnapshot) {
+              final reports = commentSnapshot.hasData
+                  ? commentSnapshot.data!.docs
+                        .map((doc) => {'id': doc.id, ...doc.data()})
+                        .toList()
+                  : <Map<String, dynamic>>[];
 
-          // Status Update Buttons (only for assignee)
-          if (isAssignee && _task!['status'] != 'done')
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Update Status',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        if (_task!['status'] == 'todo')
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _updateStatus('in-progress'),
-                              icon: const Icon(Icons.play_arrow),
-                              label: const Text('Start Task'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.statusInProgress,
-                              ),
-                            ),
-                          ),
-                        if (_task!['status'] == 'in-progress') ...[
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _updateStatus('done'),
-                              icon: const Icon(Icons.check),
-                              label: const Text('Complete'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.statusDone,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (isAssignee && _task!['status'] != 'done')
-            const SizedBox(height: 16),
-
-          // Progress Reports Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return ListView(
+                padding: const EdgeInsets.all(24),
                 children: [
-                  const Text(
-                    'Progress Reports',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.textLight.withValues(alpha: 0.1),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Add Report (only for assignee)
-                  if (isAssignee) ...[
-                    // Comment Type Selector
-                    Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildCommentTypeChip('text', 'Text', Icons.text_fields),
-                        const SizedBox(width: 8),
-                        _buildCommentTypeChip('link', 'Link', Icons.link),
-                        const SizedBox(width: 8),
-                        _buildCommentTypeChip('file', 'File', Icons.attach_file),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Text Input
-                    if (_commentType == 'text') ...[
-                      TextField(
-                        controller: _reportController,
-                        decoration: InputDecoration(
-                          hintText: 'Add a progress update...',
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.attach_file),
-                                onPressed: _pickFile,
-                                tooltip: 'Attach file',
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                              IconButton(
-                                icon: _isSubmittingReport
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.send),
-                                onPressed: _isSubmittingReport ? null : _submitReport,
+                              decoration: BoxDecoration(
+                                color: priorityColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ],
-                          ),
-                        ),
-                        maxLines: 3,
-                      ),
-                    ],
-
-                    // Link Input
-                    if (_commentType == 'link') ...[
-                      TextField(
-                        controller: _linkController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter URL (e.g., https://...)',
-                          prefixIcon: const Icon(Icons.link),
-                          suffixIcon: IconButton(
-                            icon: _isSubmittingReport
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.send),
-                            onPressed: _isSubmittingReport ? null : _submitReport,
-                          ),
-                        ),
-                        keyboardType: TextInputType.url,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _reportController,
-                        decoration: const InputDecoration(
-                          hintText: 'Add description (optional)...',
-                          prefixIcon: Icon(Icons.description),
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-
-                    // File Upload
-                    if (_commentType == 'file') ...[
-                      if (_selectedFilePath != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.primary),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.insert_drive_file, color: AppTheme.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _selectedFileName!,
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                              child: Text(
+                                (task['priority'] ?? 'N/A').toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: priorityColor,
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: _clearAttachment,
-                                color: AppTheme.urgent,
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                            ],
-                          ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                AppTheme.getStatusLabel(
+                                  task['status'] ?? 'N/A',
+                                ),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _reportController,
-                          decoration: const InputDecoration(
-                            hintText: 'Add description (optional)...',
-                            prefixIcon: Icon(Icons.description),
-                          ),
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _isSubmittingReport ? null : _submitReport,
-                          icon: _isSubmittingReport
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.send),
-                          label: const Text('Submit'),
-                        ),
-                      ] else ...[
-                        ElevatedButton.icon(
-                          onPressed: _pickFile,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Choose File'),
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 20),
                         Text(
-                          'Supported: PDF, DOC, DOCX, TXT, JPG, PNG, XLSX, XLS',
+                          task['title'] ?? 'Untitled Task',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textLight,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppTheme.textPrimary,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          task['description'] ?? 'No description',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDark
+                                ? Colors.white70
+                                : AppTheme.textPrimary,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Divider(
+                          color: AppTheme.textLight.withValues(alpha: 0.2),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInfoRow(
+                          Icons.person_outline,
+                          'Assigned To',
+                          task['assignee_name'] ?? 'Unassigned',
+                          isDark,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.calendar_today_outlined,
+                          'Deadline',
+                          DateFormat('MMMM dd, yyyy').format(deadline),
+                          isDark,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.access_time,
+                          'Created',
+                          DateFormat('MMM dd, yyyy').format(createdAt),
+                          isDark,
                         ),
                       ],
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Reports List
-                  if (_reports.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'No progress reports yet',
-                          style: TextStyle(
-                            color: AppTheme.textLight,
-                            fontSize: 14,
+                  // Simple Completion Toggle
+                  if (isAssignee)
+                    GestureDetector(
+                      onTap: () {
+                        final newStatus = task['status'] == 'done'
+                            ? 'todo'
+                            : 'done';
+                        _updateStatus(newStatus, reports);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: task['status'] == 'done'
+                              ? AppTheme.statusDone.withValues(alpha: 0.1)
+                              : AppTheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: task['status'] == 'done'
+                                ? AppTheme.statusDone
+                                : AppTheme.primary,
+                            width: 2,
                           ),
                         ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: task['status'] == 'done'
+                                    ? AppTheme.statusDone
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: task['status'] == 'done'
+                                      ? AppTheme.statusDone
+                                      : AppTheme.primary,
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: task['status'] == 'done'
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 22,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    task['status'] == 'done'
+                                        ? 'Task Completed'
+                                        : 'Mark as Complete',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: task['status'] == 'done'
+                                          ? AppTheme.statusDone
+                                          : AppTheme.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    task['status'] == 'done'
+                                        ? 'Tap to mark as incomplete'
+                                        : 'Tap to mark this task as done',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textLight,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              task['status'] == 'done'
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: task['status'] == 'done'
+                                  ? AppTheme.statusDone
+                                  : AppTheme.primary,
+                              size: 32,
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  else
-                    ..._reports.map((report) => _buildReportItem(report)),
+                    ),
+                  const SizedBox(height: 24),
+                  if (isAssignee && task['status'] != 'done')
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.textLight.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Update Status',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              if (task['status'] == 'todo')
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _updateStatus('in-progress', reports),
+                                    icon: const Icon(Icons.play_arrow),
+                                    label: const Text('Start Task'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          AppTheme.statusInProgress,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (task['status'] == 'in-progress') ...[
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _updateStatus('done', reports),
+                                    icon: const Icon(Icons.check),
+                                    label: const Text('Complete'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.statusDone,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (isAssignee && task['status'] != 'done')
+                    const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.textLight.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Progress Reports',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (isAssignee) ...[
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildCommentTypeChip(
+                                  'text',
+                                  'Text',
+                                  Icons.text_fields,
+                                ),
+                                const SizedBox(width: 8),
+                                _buildCommentTypeChip(
+                                  'link',
+                                  'Link',
+                                  Icons.link,
+                                ),
+                                const SizedBox(width: 8),
+                                _buildCommentTypeChip(
+                                  'file',
+                                  'File',
+                                  Icons.attach_file,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (_commentType == 'text') ...[
+                            TextField(
+                              controller: _reportController,
+                              decoration: InputDecoration(
+                                hintText: 'Add a progress update...',
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.black.withValues(alpha: 0.2)
+                                    : Colors.grey[50],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                suffixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.attach_file),
+                                      onPressed: _pickFile,
+                                      tooltip: 'Attach file',
+                                    ),
+                                    IconButton(
+                                      icon: _isSubmittingReport
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.send),
+                                      onPressed: _isSubmittingReport
+                                          ? null
+                                          : _submitReport,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              maxLines: 3,
+                            ),
+                          ],
+                          if (_commentType == 'link') ...[
+                            TextField(
+                              controller: _linkController,
+                              decoration: InputDecoration(
+                                hintText: 'Enter URL (e.g., https://...)',
+                                prefixIcon: const Icon(Icons.link),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.black.withValues(alpha: 0.2)
+                                    : Colors.grey[50],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: _isSubmittingReport
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.send),
+                                  onPressed: _isSubmittingReport
+                                      ? null
+                                      : _submitReport,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              keyboardType: TextInputType.url,
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _reportController,
+                              decoration: InputDecoration(
+                                hintText: 'Add description (optional)...',
+                                prefixIcon: const Icon(Icons.description),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.black.withValues(alpha: 0.2)
+                                    : Colors.grey[50],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              maxLines: 2,
+                            ),
+                          ],
+                          if (_commentType == 'file') ...[
+                            if (_selectedFilePath != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.primary.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.insert_drive_file,
+                                      color: AppTheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        _selectedFileName!,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: _clearAttachment,
+                                      color: AppTheme.urgent,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _reportController,
+                                decoration: InputDecoration(
+                                  hintText: 'Add description (optional)...',
+                                  prefixIcon: const Icon(Icons.description),
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? Colors.black.withValues(alpha: 0.2)
+                                      : Colors.grey[50],
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                                maxLines: 2,
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSubmittingReport
+                                      ? null
+                                      : _submitReport,
+                                  icon: _isSubmittingReport
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.send),
+                                  label: const Text('Submit Report'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ] else ...[
+                              OutlinedButton.icon(
+                                onPressed: _pickFile,
+                                icon: const Icon(Icons.upload_file),
+                                label: const Text('Choose File'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Supported: PDF, DOC, DOCX, TXT, JPG, PNG, XLSX, XLS',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textLight,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
+                          const SizedBox(height: 24),
+                          Divider(
+                            color: AppTheme.textLight.withValues(alpha: 0.2),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        if (reports.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'No progress reports yet',
+                                style: TextStyle(
+                                  color: AppTheme.textLight,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...reports.map(
+                            (report) => _buildReportItem(report, isDark),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -584,45 +842,44 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value, bool isDark) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppTheme.textLight),
-        const SizedBox(width: 8),
+        Icon(icon, size: 18, color: AppTheme.textLight),
+        const SizedBox(width: 12),
         Text(
           '$label: ',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTheme.textLight,
-          ),
+          style: TextStyle(fontSize: 14, color: AppTheme.textLight),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildReportItem(Map<String, dynamic> report) {
-    final reportedAt = DateTime.parse(report['reported_at']);
-    final formattedDate = DateFormat('MMM dd, yyyy HH:mm').format(reportedAt);
+  Widget _buildReportItem(Map<String, dynamic> report, bool isDark) {
+    final reportedAt =
+        (report['reported_at'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final formattedDate = DateFormat('MMM dd, HH:mm').format(reportedAt);
     final commentType = report['comment_type'] ?? 'text';
     final attachmentPath = report['attachment_path'];
     final reporterName = report['reporter_name'] ?? 'Unknown';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
-        ),
+        color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +890,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 radius: 16,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                 child: Text(
-                  reporterName[0].toUpperCase(),
+                  reporterName.isNotEmpty ? reporterName[0].toUpperCase() : '?',
                   style: const TextStyle(
                     color: AppTheme.primary,
                     fontSize: 12,
@@ -641,62 +898,64 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       reporterName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
+                        color: isDark ? Colors.white : AppTheme.textPrimary,
                       ),
                     ),
                     Text(
                       formattedDate,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textLight,
-                      ),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textLight),
                     ),
                   ],
                 ),
               ),
-              // Comment type indicator
               if (commentType == 'file')
                 const Icon(Icons.attach_file, size: 18, color: AppTheme.primary)
               else if (commentType == 'link')
                 const Icon(Icons.link, size: 18, color: AppTheme.primary),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             report['comment_text'] ?? '',
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.white70 : AppTheme.textPrimary,
+            ),
           ),
-
-          // File/Link attachment display
           if (attachmentPath != null && attachmentPath.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (commentType == 'file')
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(6),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppTheme.primary.withValues(alpha: 0.2),
+                    color: AppTheme.textLight.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.insert_drive_file, size: 16, color: AppTheme.primary),
-                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.insert_drive_file,
+                      size: 20,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        attachmentPath.split('/').last,
+                        path.basename(attachmentPath),
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppTheme.primary,
@@ -711,25 +970,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             else if (commentType == 'link')
               InkWell(
                 onTap: () {
-                  // URL will be opened here in future (requires url_launcher)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Link: $attachmentPath')),
-                  );
+                  // URL launcher logic here
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.secondary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: AppTheme.secondary.withValues(alpha: 0.2),
+                      color: AppTheme.textLight.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.link, size: 16, color: AppTheme.secondary),
-                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.link,
+                        size: 20,
+                        color: AppTheme.secondary,
+                      ),
+                      const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           attachmentPath,
@@ -742,7 +1002,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.open_in_new, size: 12, color: AppTheme.secondary),
+                      const Icon(
+                        Icons.open_in_new,
+                        size: 12,
+                        color: AppTheme.secondary,
+                      ),
                     ],
                   ),
                 ),
@@ -753,4 +1017,3 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 }
-

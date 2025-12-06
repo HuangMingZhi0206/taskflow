@@ -1,81 +1,91 @@
+import 'package:flutter/foundation.dart';
+
 /// App Configuration
 ///
 /// Central configuration for TaskFlow app
 /// Set USE_FIREBASE to false to use SQLite only (offline mode)
-
 class AppConfig {
   // ==================== DATABASE MODE ====================
 
   /// Use Firebase/Firestore for cloud storage
   /// Set to false to use SQLite only (offline mode)
-  static const bool USE_FIREBASE = false;
+  static const bool useFirebase = false;
 
   /// Use local SQLite database
   /// Always true for offline mode or as backup
-  static const bool USE_SQLITE = true;
+  static const bool useSqlite = true;
 
   // ==================== FEATURE FLAGS ====================
 
   /// Enable offline mode features
-  static const bool OFFLINE_MODE = !USE_FIREBASE;
+  static const bool offlineMode = !useFirebase;
 
   /// Enable cloud sync (requires Firebase)
-  static const bool ENABLE_CLOUD_SYNC = USE_FIREBASE;
+  static const bool enableCloudSync = useFirebase;
 
   /// Enable push notifications (requires Firebase)
-  static const bool ENABLE_PUSH_NOTIFICATIONS = USE_FIREBASE;
+  static const bool enablePushNotifications = useFirebase;
 
   // ==================== APP INFO ====================
 
-  static const String APP_NAME = 'TaskFlow';
-  static const String APP_VERSION = '2.1.1';
-  static const String APP_MODE = USE_FIREBASE ? 'Online' : 'Offline (SQLite)';
+  static const String appName = 'TaskFlow';
+  static const String appVersion = '2.1.1';
+  static const String appMode = useFirebase ? 'Online' : 'Offline (SQLite)';
 
   // ==================== DATABASE ====================
 
-  static const String SQLITE_DB_NAME = 'taskflow.db';
-  static const int SQLITE_DB_VERSION = 1;
+  static const String sqliteDbName = 'taskflow.db';
+  static const int sqliteDbVersion = 1;
 
   // ==================== STORAGE ====================
 
   /// Max file size for attachments (in MB)
-  static const int MAX_FILE_SIZE_MB = 10;
+  static const int maxFileSizeMb = 10;
 
   /// Allowed file extensions
-  static const List<String> ALLOWED_FILE_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx',
-    'jpg', 'jpeg', 'png', 'gif',
-    'txt', 'zip', 'rar'
+  static const List<String> allowedFileExtensions = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'txt',
+    'zip',
+    'rar',
   ];
 
   // ==================== UI ====================
 
   /// Show mode indicator in UI
-  static const bool SHOW_MODE_INDICATOR = true;
+  static const bool showModeIndicator = true;
 
   /// Theme mode
-  static const String DEFAULT_THEME = 'light';
+  static const String defaultTheme = 'light';
 
   // ==================== DEBUG ====================
 
   /// Enable debug logging
-  static const bool DEBUG_MODE = true;
+  static const bool debugMode = true;
 
   /// Print SQL queries
-  static const bool LOG_SQL_QUERIES = false;
+  static const bool logSqlQueries = false;
 
   // ==================== HELPERS ====================
 
-  static String get databaseMode => USE_FIREBASE ? 'Firebase/Firestore' : 'SQLite';
+  static String get databaseMode =>
+      useFirebase ? 'Firebase/Firestore' : 'SQLite';
 
   static void printConfig() {
-    print('========================================');
-    print('$APP_NAME v$APP_VERSION');
-    print('Mode: $APP_MODE');
-    print('Database: $databaseMode');
-    print('Offline Mode: $OFFLINE_MODE');
-    print('Cloud Sync: ${ENABLE_CLOUD_SYNC ? 'Enabled' : 'Disabled'}');
-    print('========================================');
+    debugPrint('========================================');
+    debugPrint('$appName v$appVersion');
+    debugPrint('Mode: $appMode');
+    debugPrint('Database: $databaseMode');
+    debugPrint('Offline Mode: $offlineMode');
+    debugPrint('Cloud Sync: ${enableCloudSync ? 'Enabled' : 'Disabled'}');
+    debugPrint('========================================');
   }
 }
-

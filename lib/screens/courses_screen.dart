@@ -26,14 +26,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final courses = await CourseService.instance.getUserCourses(widget.user['id'].toString());
+      final courses = await CourseService.instance.getUserCourses(
+        widget.user['id'].toString(),
+      );
+      if (!mounted) return;
       setState(() {
         _courses = courses;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading courses: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -47,66 +51,125 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('📚 My Courses'),
+        title: const Text(
+          'My Courses',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCourses,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddCourseDialog(),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Course'),
+        backgroundColor: AppTheme.primary,
+        elevation: 2,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _courses.isEmpty
-              ? _buildEmptyState()
-              : _buildCoursesList(),
+      body: RefreshIndicator(
+        onRefresh: _loadCourses,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Manage your academic courses',
+                      style: TextStyle(fontSize: 16, color: AppTheme.textLight),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ),
+            _isLoading
+                ? const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _courses.isEmpty
+                ? SliverFillRemaining(child: _buildEmptyState())
+                : SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0,
+                          vertical: 6.0,
+                        ),
+                        child: _buildCourseCard(_courses[index], isDark),
+                      );
+                    }, childCount: _courses.length),
+                  ),
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.book_outlined, size: 64, color: AppTheme.textLight),
-          const SizedBox(height: 16),
-          const Text(
-            'No courses yet',
-            style: TextStyle(fontSize: 18, color: AppTheme.textLight),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Add your courses to get started',
-            style: TextStyle(color: AppTheme.textLight),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _showAddCourseDialog(),
-            icon: const Icon(Icons.add),
-            label: const Text('Add First Course'),
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.book_outlined,
+              size: 64,
+              color: AppTheme.textLight.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No courses yet',
+              style: TextStyle(
+                fontSize: 18,
+                color: AppTheme.textLight,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add your courses to get started',
+              style: TextStyle(color: AppTheme.textLight),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCoursesList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _courses.length,
-      itemBuilder: (context, index) {
-        final course = _courses[index];
-        return _buildCourseCard(course);
-      },
-    );
-  }
-
-  Widget _buildCourseCard(CourseModel course) {
+  Widget _buildCourseCard(CourseModel course, bool isDark) {
     final courseColor = _getCourseColor(course.color);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: InkWell(
         onTap: () => _showCourseDetailsDialog(course),
         borderRadius: BorderRadius.circular(12),
@@ -114,7 +177,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Color indicator
               Container(
                 width: 4,
                 height: 60,
@@ -124,7 +186,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Course info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,15 +201,16 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     const SizedBox(height: 4),
                     Text(
                       course.courseName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : AppTheme.textPrimary,
                       ),
                     ),
                     if (course.instructor != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '👨‍🏫 ${course.instructor}',
+                        'Instructor: ${course.instructor}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppTheme.textLight,
@@ -158,8 +220,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   ],
                 ),
               ),
-              // Actions
               PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: AppTheme.textLight),
                 onSelected: (value) {
                   if (value == 'edit') {
                     _showEditCourseDialog(course);
@@ -229,8 +291,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
           title: const Text('Add Course'),
           content: SingleChildScrollView(
             child: Column(
@@ -273,7 +335,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 const SizedBox(height: 16),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Course Color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Course Color:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -289,11 +354,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           color: Color(int.parse('0xFF${entry.value}')),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected ? Colors.white : Colors.transparent,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.transparent,
                             width: 3,
                           ),
                           boxShadow: isSelected
-                              ? [BoxShadow(color: Colors.black26, blurRadius: 4)]
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                  ),
+                                ]
                               : null,
                         ),
                       ),
@@ -305,24 +377,25 @@ class _CoursesScreenState extends State<CoursesScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (courseCodeController.text.trim().isEmpty ||
                     courseNameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill required fields')),
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill required fields'),
+                    ),
                   );
                   return;
                 }
 
                 try {
-                  print('User ID from widget: ${widget.user['id']} (type: ${widget.user['id'].runtimeType})');
-
                   await CourseService.instance.createCourse(
-                    userId: widget.user['id'].toString(), // Ensure string conversion
+                    userId: widget.user['id']
+                        .toString(), // Ensure string conversion
                     courseCode: courseCodeController.text.trim(),
                     courseName: courseNameController.text.trim(),
                     instructor: instructorController.text.trim().isEmpty
@@ -334,16 +407,26 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     color: selectedColor,
                   );
 
-                  Navigator.pop(context);
+                  if (!dialogContext.mounted) return;
+                  Navigator.pop(dialogContext);
                   _loadCourses();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ Course added!')),
-                  );
+                  // check original context for snackbar after pop if needed, or dialogContext before pop?
+                  // If we use dialogContext before pop, it shows on dialog? No, SnackBar shows on Scaffold.
+                  // But we popped it.
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Course added successfully'),
+                      ),
+                    );
+                  }
                 } catch (e) {
-                  print('Error creating course: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  // Error creating course
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(
+                      dialogContext,
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 }
               },
               child: const Text('Add'),
@@ -357,9 +440,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
   void _showEditCourseDialog(CourseModel course) {
     // Similar to add, but pre-filled
     // Implementation abbreviated for brevity
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit feature coming soon!')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Edit feature coming soon!')));
   }
 
   void _showCourseDetailsDialog(CourseModel course) {
@@ -400,20 +483,29 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }
 
   void _showAddScheduleDialog(CourseModel course) {
-    final daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final daysOfWeek = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     String? selectedDay;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
           title: Text('Add Schedule for ${course.courseCode}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
                 value: selectedDay,
                 decoration: const InputDecoration(labelText: 'Day of Week'),
                 items: daysOfWeek.map((day) {
@@ -428,9 +520,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
                   final time = await showTimePicker(
-                    context: context,
-                    initialTime: startTime ?? const TimeOfDay(hour: 9, minute: 0),
+                    context: dialogContext,
+                    initialTime:
+                        startTime ?? const TimeOfDay(hour: 9, minute: 0),
                   );
+                  if (!dialogContext.mounted) return;
                   if (time != null) setState(() => startTime = time);
                 },
               ),
@@ -440,9 +534,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
                   final time = await showTimePicker(
-                    context: context,
-                    initialTime: endTime ?? const TimeOfDay(hour: 10, minute: 30),
+                    context: dialogContext,
+                    initialTime:
+                        endTime ?? const TimeOfDay(hour: 10, minute: 30),
                   );
+                  if (!dialogContext.mounted) return;
                   if (time != null) setState(() => endTime = time);
                 },
               ),
@@ -450,13 +546,15 @@ class _CoursesScreenState extends State<CoursesScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
-                if (selectedDay == null || startTime == null || endTime == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (selectedDay == null ||
+                    startTime == null ||
+                    endTime == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(content: Text('Please fill all fields')),
                   );
                   return;
@@ -465,21 +563,31 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 try {
                   await CourseService.instance.addClassSchedule(
                     courseId: course.id,
-                    userId: widget.user['id'].toString(), // Ensure string conversion
+                    userId: widget.user['id']
+                        .toString(), // Ensure string conversion
                     dayOfWeek: selectedDay!,
-                    startTime: '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}',
-                    endTime: '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}',
+                    startTime:
+                        '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}',
+                    endTime:
+                        '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}',
                     room: course.room,
                   );
 
-                  Navigator.pop(context);
+                  if (!dialogContext.mounted) return;
+                  Navigator.pop(dialogContext);
+
+                  if (!mounted) return; // Check parent state
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ Schedule added!')),
+                    const SnackBar(
+                      content: Text('Schedule added successfully'),
+                    ),
                   );
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(
+                      dialogContext,
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 }
               },
               child: const Text('Add'),
@@ -493,30 +601,32 @@ class _CoursesScreenState extends State<CoursesScreen> {
   void _confirmDeleteCourse(CourseModel course) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Course'),
-        content: Text('Are you sure you want to delete "${course.courseName}"?'),
+        content: Text(
+          'Are you sure you want to delete "${course.courseName}"?',
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               try {
                 await CourseService.instance.deleteCourse(course.id);
+                if (!mounted) return;
                 _loadCourses();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Course deleted')),
-                  );
-                }
+                // Use outer context since dialog is popped
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Course deleted')));
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               }
             },
@@ -527,4 +637,3 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
   }
 }
-

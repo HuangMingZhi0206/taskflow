@@ -1,8 +1,9 @@
-/// Local Storage Service
-///
-/// Handles file storage operations locally instead of Firebase Storage
-/// Files are saved to app's local directory and paths stored in database
+// Local Storage Service
+//
+// Handles file storage operations locally instead of Firebase Storage
+// Files are saved to app's local directory and paths stored in database
 
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -59,10 +60,10 @@ class LocalStorageService {
       // Copy file to local storage
       await sourceFile.copy(destinationPath);
 
-      print('File saved to local storage: $destinationPath');
+      debugPrint('File saved to local storage: $destinationPath');
       return destinationPath;
     } catch (e) {
-      print('Error uploading file to local storage: $e');
+      debugPrint('Error uploading file to local storage: $e');
       rethrow;
     }
   }
@@ -75,7 +76,9 @@ class LocalStorageService {
   }) async {
     try {
       final Directory storageDir = await _getStorageDirectory();
-      final Directory taskDir = Directory('${storageDir.path}/task_attachments/$userId/$taskId');
+      final Directory taskDir = Directory(
+        '${storageDir.path}/task_attachments/$userId/$taskId',
+      );
 
       if (!await taskDir.exists()) {
         await taskDir.create(recursive: true);
@@ -89,10 +92,10 @@ class LocalStorageService {
 
       await sourceFile.copy(destinationPath);
 
-      print('Task attachment saved: $destinationPath');
+      debugPrint('Task attachment saved: $destinationPath');
       return destinationPath;
     } catch (e) {
-      print('Error uploading task attachment: $e');
+      debugPrint('Error uploading task attachment: $e');
       rethrow;
     }
   }
@@ -104,7 +107,9 @@ class LocalStorageService {
   }) async {
     try {
       final Directory storageDir = await _getStorageDirectory();
-      final Directory profileDir = Directory('${storageDir.path}/profile_pictures/$userId');
+      final Directory profileDir = Directory(
+        '${storageDir.path}/profile_pictures/$userId',
+      );
 
       if (!await profileDir.exists()) {
         await profileDir.create(recursive: true);
@@ -123,10 +128,10 @@ class LocalStorageService {
 
       await sourceFile.copy(destinationPath);
 
-      print('Profile picture saved: $destinationPath');
+      debugPrint('Profile picture saved: $destinationPath');
       return destinationPath;
     } catch (e) {
-      print('Error uploading profile picture: $e');
+      debugPrint('Error uploading profile picture: $e');
       rethrow;
     }
   }
@@ -137,10 +142,10 @@ class LocalStorageService {
       final File file = File(filePath);
       if (await file.exists()) {
         await file.delete();
-        print('File deleted: $filePath');
+        debugPrint('File deleted: $filePath');
       }
     } catch (e) {
-      print('Error deleting file: $e');
+      debugPrint('Error deleting file: $e');
       rethrow;
     }
   }
@@ -152,14 +157,16 @@ class LocalStorageService {
   }) async {
     try {
       final Directory storageDir = await _getStorageDirectory();
-      final Directory taskDir = Directory('${storageDir.path}/task_attachments/$userId/$taskId');
+      final Directory taskDir = Directory(
+        '${storageDir.path}/task_attachments/$userId/$taskId',
+      );
 
       if (await taskDir.exists()) {
         await taskDir.delete(recursive: true);
-        print('Task attachments deleted for task: $taskId');
+        debugPrint('Task attachments deleted for task: $taskId');
       }
     } catch (e) {
-      print('Error deleting task attachments: $e');
+      debugPrint('Error deleting task attachments: $e');
       rethrow;
     }
   }
@@ -170,7 +177,7 @@ class LocalStorageService {
       final File file = File(filePath);
       return await file.exists();
     } catch (e) {
-      print('Error checking file existence: $e');
+      debugPrint('Error checking file existence: $e');
       return false;
     }
   }
@@ -184,7 +191,7 @@ class LocalStorageService {
       }
       return 0;
     } catch (e) {
-      print('Error getting file size: $e');
+      debugPrint('Error getting file size: $e');
       return 0;
     }
   }
@@ -205,7 +212,7 @@ class LocalStorageService {
 
       return totalSize;
     } catch (e) {
-      print('Error calculating storage used: $e');
+      debugPrint('Error calculating storage used: $e');
       return 0;
     }
   }
@@ -216,10 +223,10 @@ class LocalStorageService {
       final Directory storageDir = await _getStorageDirectory();
       if (await storageDir.exists()) {
         await storageDir.delete(recursive: true);
-        print('All local storage cleared');
+        debugPrint('All local storage cleared');
       }
     } catch (e) {
-      print('Error clearing storage: $e');
+      debugPrint('Error clearing storage: $e');
       rethrow;
     }
   }
@@ -230,4 +237,3 @@ class LocalStorageService {
     return storageDir.path;
   }
 }
-

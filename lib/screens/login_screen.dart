@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../database/database_helper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_theme.dart';
 import '../services/theme_service.dart';
 
@@ -27,31 +28,52 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorDialog('Please enter both email/student ID and password');
+      _showSnackBar('Please enter both email and password');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final user = await DatabaseHelper.instance.loginUser(
-        _emailController.text.trim(),
-        _passwordController.text,
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
-      if (!mounted) return;
+      if (credential.user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(credential.user!.uid)
+            .get();
+        final userData = userDoc.data();
 
-      if (user != null) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/dashboard',
-          arguments: user,
+        if (!mounted) return;
+
+        if (userData != null) {
+          _showSnackBar('Login successful');
+          Navigator.pushReplacementNamed(
+            context,
+            '/dashboard',
+            arguments: {'id': credential.user!.uid, ...userData},
+          );
+        } else {
+          _showSnackBar('User data not found. Please contact support.');
+        }
+      } else {
+        _showSnackBar(
+          'Invalid credentials. Please check your email and password.',
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+        _showSnackBar(
+          'Invalid credentials. Please check your email and password.',
         );
       } else {
-        _showErrorDialog('Invalid credentials. Please check your email/student ID and password.');
+        _showSnackBar('An error occurred: ${e.message}');
       }
     } catch (e) {
-      _showErrorDialog('An error occurred: $e');
+      _showSnackBar('An error occurred: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -59,89 +81,92 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppTheme.secondary,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // App Logo/Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.task_alt,
-                    size: 50,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Title
+                // Welcome Text
                 Text(
-                  'TaskFlow',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: AppTheme.primary,
+                  'Welcome Back',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppTheme.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Student Productivity Hub',
+                  'Please sign in to your account',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkTextLight
-                            : AppTheme.textLight,
-                      ),
+                    color: isDark ? Colors.white70 : AppTheme.textLight,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
 
-                // Email/Student ID Input
-                TextField(
+                // Email Input
+                TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email or Student ID',
-                    prefixIcon: Icon(Icons.person_outline),
-                    hintText: 'Enter your email or student ID',
+                  decoration: InputDecoration(
+                    labelText: 'Email Address',
+                    hintText: 'name@example.com',
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppTheme.textLight.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppTheme.textLight.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.black.withValues(alpha: 0.2)
+                        : Colors.white,
                   ),
-                  keyboardType: TextInputType.text,
+                  keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
                 // Password Input
-                TextField(
+                TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
                     labelText: 'Password',
+                    hintText: 'Enter your password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -151,60 +176,102 @@ class _LoginScreenState extends State<LoginScreen> {
                         setState(() => _showPassword = !_showPassword);
                       },
                     ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppTheme.textLight.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppTheme.textLight.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.black.withValues(alpha: 0.2)
+                        : Colors.white,
                   ),
                   obscureText: !_showPassword,
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _login(),
-                ),
-                const SizedBox(height: 24),
-
-                // Login Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Login',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                  onFieldSubmitted: (_) => _login(),
                 ),
                 const SizedBox(height: 32),
 
-                // Registration Section
-                const Divider(),
-                const SizedBox(height: 16),
-
-                // Register Button
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/register');
-                  },
-                  child: Text.rich(
-                    TextSpan(
-                      text: "Don't have an account? ",
-                      style: const TextStyle(color: AppTheme.textLight),
-                      children: const [
-                        TextSpan(
-                          text: 'Sign Up',
-                          style: TextStyle(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                // Login Button
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
+                ),
+                const SizedBox(height: 24),
+
+                // Register Link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Don't have an account? ",
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : AppTheme.textLight,
+                        fontSize: 14,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/register');
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
+                      child: const Text(
+                        'Create Account',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -214,4 +281,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

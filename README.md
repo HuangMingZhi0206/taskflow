@@ -1,321 +1,62 @@
-# TaskFlow - Student Academic Productivity Assistant 🎓
+# TaskFlow 🚀
 
-A modern, intuitive Flutter mobile application designed specifically for **university students** to manage assignments, exams, projects, and study time effectively.
+**TaskFlow** is a comprehensive productivity application built with Flutter, designed to help you organize tasks, manage your schedule, and stay focused using the Pomodoro technique.
 
-## 🌟 Student Edition - What's New!
+## 🌟 Key Features
 
-TaskFlow has been transformed from a team management tool into a **personal academic assistant** for students:
+### 🍅 Smart Pomodoro Timer
+- **Continuous Flow**: Automatically switches between Focus, Short Break, and Long Break modes.
+- **Customizable**: Adjust durations and the number of intervals ("sections") before a long break.
+- **Background Notifications**: Get notified with sound and alerts even when the app is in the background.
+- **Visual Tracking**: Track your progress with visual interval dots (● ● ○ ○).
+- **Task Labeling**: Set a specific task intention for each focus session.
 
-- ✅ **No Demo Accounts** - Create your own account with Student ID
-- ✅ **Personal Task Management** - All tasks are yours
-- ✅ **Academic Course Tags** - Organize by Assignment, Exam, Project, etc.
-- ✅ **Time Estimation** - Plan your study hours effectively
-- ✅ **Student-Friendly UI** - Encouraging messages and academic focus
+### ✅ Task Management
+- Create, Read, Update, and Delete tasks.
+- Categorize tasks with tags and priority.
+- Track completion status.
 
-## 📚 Documentation Index
+### 📅 Schedule & Calendar
+- View your tasks in a Daily, Weekly, or Monthly calendar view.
+- Plan your day effectively with a clear timeline.
 
-### 🎓 Student Resources (START HERE!)
-- **[STUDENT_QUICKSTART.md](STUDENT_QUICKSTART.md)** - 🚀 New students start here!
-- **[STUDENT_VERSION_GUIDE.md](STUDENT_VERSION_GUIDE.md)** - 📖 Complete transformation guide
+### 📊 Dashboard & Stats
+- Overview of your pending and completed tasks.
+- Visual statistics (using FL Chart) to monitor productivity.
 
-### 📋 Technical Documentation
-- **[SETUP.md](SETUP.md)** - ⚡ Developer setup instructions
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - 📋 Complete project overview
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - 🏗️ Technical architecture & diagrams
-- **[API.md](API.md)** - 💾 Database API reference
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - 📦 Build & deployment guide
+## 🛠️ Tech Stack
 
-## ⚡ Quick Start (Students)
-
-```bash
-# 1. Install dependencies
-flutter pub get
-
-# 2. Run the app
-flutter run
-
-# 3. Create your student account
-- Click "Sign Up"
-- Enter your Student ID, Email, and Password
-- Login and start managing your academic life!
-```
-
-## 📱 Features
-
-### 🎓 Academic Focus
-- **Student Registration**: Create account with Student ID or Email
-- **Personal Tasks**: All tasks auto-assigned to you
-- **Course Tags**: 8 academic tags (Assignment, Exam, Project, Reading, Lab, Research, Presentation, Study Group)
-- **Time Estimation**: Plan study hours for each task
-- **Smart Deadlines**: Calendar picker for due dates
-
-### 📊 Organization
-- **Priority Levels**: Urgent (🔴), Medium (🟡), Low (🟢)
-- **Status Tracking**: To Do, In Progress, Done
-- **Tag-Based Filtering**: Filter tasks by course or type
-- **Real-time Updates**: Pull-to-refresh for latest data
-
-### 🎨 Student-Friendly Design
-- **Encouraging Messages**: "You got this! 💪"
-- **Clean UI**: Minimalist, distraction-free interface
-- **Color-Coded Tags**: Visual organization by course
-- **Mobile-First**: Optimized for quick task entry
-
-## 🛠️ Technology Stack
-
-- **Framework**: Flutter 3.10+
-- **Language**: Dart
-- **Database**: SQLite (via sqflite package)
-- **State Management**: StatefulWidget with local state
-- **Date Formatting**: intl package
-
-## 📋 Prerequisites
-
-- Flutter SDK 3.10 or higher
-- Android Studio / VS Code with Flutter extensions
-- Android SDK for Android development
-- Xcode for iOS development (macOS only)
+- **Framework**: Flutter (Dart)
+- **Backend Service**: Firebase (Firestore, Auth)
+- **Local Storage**: Shared Preferences
+- **Notifications**: Flutter Local Notifications
+- **Charts**: FL Chart
 
 ## 🚀 Getting Started
 
-### 1. Clone or Open the Project
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/HuangMingZhi0206/taskflow.git
+    ```
 
-```bash
-cd C:\Users\ASUS\AndroidStudioProjects\taskflow
-```
+2.  **Install dependencies**:
+    ```bash
+    flutter pub get
+    ```
 
-### 2. Install Dependencies
+3.  **Firebase Setup**:
+    -   Ensure you have your `google-services.json` (Android) or `GoogleService-Info.plist` (iOS) in the respective `android/app` or `ios/Runner` directories.
 
-In Android Studio:
-- Open the project
-- Wait for the IDE to detect the `pubspec.yaml`
-- Click "Pub get" when prompted, or manually run:
+4.  **Run the App**:
+    ```bash
+    flutter run
+    ```
 
-Alternatively, use the terminal (if Flutter is in PATH):
-```bash
-flutter pub get
-```
+## 📱 Screenshots
 
-### 3. Run the Application
+| Home | Pomodoro | Schedule |
+|------|----------|----------|
+| ![Home](assets/home.png) | ![Pomodoro](assets/pomodoro.png) | ![Schedule](assets/schedule.png) |
 
-**Using Android Studio:**
-- Select a device/emulator
-- Click the Run button (green play icon)
-
-**Using Terminal:**
-```bash
-flutter run
-```
-
-## 🔐 Demo Accounts
-
-The app comes with pre-configured demo accounts:
-
-### Manager Account
-- **Email**: manager@taskflow.com
-- **Password**: manager123
-- **Capabilities**: Create tasks, assign to team, view all tasks, delete tasks
-
-### Staff Account 1
-- **Email**: staff@taskflow.com
-- **Password**: staff123
-- **Capabilities**: View assigned tasks, update status, submit progress reports
-
-### Staff Account 2
-- **Email**: mike@taskflow.com
-- **Password**: mike123
-- **Capabilities**: View assigned tasks, update status, submit progress reports
-
-## 📱 Application Screens
-
-### 1. Login Screen
-- Email and password authentication
-- Quick login buttons for demo accounts
-- Password visibility toggle
-
-### 2. Dashboard
-- View all tasks (Manager) or assigned tasks (Staff)
-- Filter by status (All, To Do, In Progress, Done)
-- Pull-to-refresh functionality
-- Task cards with priority and status indicators
-
-### 3. Add Task Screen (Manager Only)
-- Task title and description input
-- Priority selection (Urgent, Medium, Low)
-- Deadline picker
-- Team member assignment
-- Form validation
-
-### 4. Task Detail Screen
-- Complete task information
-- Status update buttons (for assignees)
-- Progress reporting section
-- Chronological report history
-
-## 📦 Project Structure
-
-```
-lib/
-├── main.dart                 # App entry point & routing
-├── database/
-│   └── database_helper.dart  # SQLite database operations
-├── theme/
-│   └── app_theme.dart        # Design system & theming
-└── screens/
-    ├── login_screen.dart         # Authentication
-    ├── dashboard_screen.dart     # Task list & overview
-    ├── add_task_screen.dart      # Task creation form
-    └── task_detail_screen.dart   # Task details & reports
-```
-
-## 🗄️ Database Schema
-
-### Users Table
-```sql
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('manager', 'staff'))
-);
-```
-
-### Tasks Table
-```sql
-CREATE TABLE tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  assignee_name TEXT NOT NULL,
-  assignee_id INTEGER,
-  priority TEXT NOT NULL CHECK(priority IN ('urgent', 'medium', 'low')),
-  status TEXT NOT NULL CHECK(status IN ('todo', 'in-progress', 'done')),
-  deadline TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  created_by INTEGER NOT NULL,
-  FOREIGN KEY (assignee_id) REFERENCES users(id),
-  FOREIGN KEY (created_by) REFERENCES users(id)
-);
-```
-
-### Task Reports Table
-```sql
-CREATE TABLE task_reports (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id INTEGER NOT NULL,
-  report_text TEXT NOT NULL,
-  reported_by INTEGER NOT NULL,
-  reported_at TEXT NOT NULL,
-  FOREIGN KEY (task_id) REFERENCES tasks(id),
-  FOREIGN KEY (reported_by) REFERENCES users(id)
-);
-```
-
-## ✅ Requirements Fulfillment
-
-### Project Requirements Checklist
-
-- ✅ **Multiple Activities/Screens**: Login, Dashboard, Add Task, Task Detail
-- ✅ **Intent Navigation**: Proper routing with arguments passing
-- ✅ **Text Input**: Task title, description, email, password
-- ✅ **Password Input**: Secure text entry with visibility toggle
-- ✅ **Selection/Picker**: Priority selection, date picker, assignee selection
-- ✅ **Radio Buttons**: Status selection, priority cards
-- ✅ **Buttons**: Login, submit, status update, filter chips
-- ✅ **SQLite Database**: Full CRUD operations with 3 tables
-- ✅ **Modern Design**: Minimalist, clean UI with consistent styling
-
-## 🎯 Key Features Implementation
-
-### Form Components
-- **Text Fields**: Title, description, email, password with validation
-- **Multi-line Input**: Task description, progress reports
-- **Date Picker**: Deadline selection with calendar UI
-- **Custom Selection**: Visual card-based selection for priority & assignees
-- **Secure Input**: Password field with show/hide toggle
-
-### Database Operations
-- **Create**: New users, tasks, and reports
-- **Read**: Query tasks by user, status, priority
-- **Update**: Modify task status
-- **Delete**: Remove tasks and cascade delete reports
-- **Joins**: Complex queries with user information
-
-### Navigation Flow
-```
-Login → Dashboard → Add Task (Manager)
-              ↓
-         Task Detail → Progress Reports
-```
-
-## 🧪 Testing
-
-### Manual Test Cases
-
-1. **Login**: Test with valid/invalid credentials
-2. **Task Creation**: Create task with all fields
-3. **Task Assignment**: Assign to different team members
-4. **Status Update**: Change status from To Do → In Progress → Done
-5. **Progress Reports**: Add multiple reports
-6. **Filtering**: Test all filter options
-7. **Delete Task**: Remove task and verify cascade delete
-8. **Pull to Refresh**: Update data from database
-
-### Test Devices
-- Android Emulator (API 30+)
-- Physical Android device (Android 8.0+)
-
-## 🔮 Future Enhancements
-
-- [ ] Push notifications for task assignments
-- [ ] Task deadline reminders
-- [ ] Search and sort functionality
-- [ ] Task categories/tags
-- [ ] File attachments
-- [ ] Calendar view
-- [ ] Analytics dashboard
-- [ ] Cloud sync (Firebase)
-- [ ] Dark mode
-- [ ] Multi-language support
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Issue**: "Target of URI doesn't exist" errors
-**Solution**: Run `flutter pub get` to install dependencies
-
-**Issue**: Database not initializing
-**Solution**: Clear app data and reinstall
-
-**Issue**: Navigation not working
-**Solution**: Check that user object is being passed correctly
-
-## 📄 License
-
-This project is created for educational purposes as part of the Wireless and Mobile Programming course.
-
-## 👥 Team Members
-
-| Name | Role | Contribution |
-|------|------|-------------|
-| [Your Name] | Project Lead | Architecture, Database, UI Implementation |
-| [Team Member 2] | Developer | Screens, Navigation, Testing |
-| [Team Member 3] | Developer | Documentation, Design, Integration |
-
-## 📚 References
-
-- [Flutter Documentation](https://flutter.dev/docs)
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
-- [Material Design Guidelines](https://material.io/design)
-- [Dart Language Tour](https://dart.dev/guides/language/language-tour)
-
-## 📞 Support
-
-For questions or issues, please contact the development team or refer to the project documentation.
-
----
-
-**Built with Flutter** 💙
-
+*(Note: Add screenshot files to your assets folder to view them here)*
+    

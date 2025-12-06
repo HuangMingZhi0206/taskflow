@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../database/database_helper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -39,53 +40,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Check if student ID already exists
-      final existingStudent = await DatabaseHelper.instance.getUserByStudentId(
-        _studentIdController.text.trim(),
-      );
+      // Create user with Firebase Authentication
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
 
-      if (existingStudent != null) {
-        _showErrorDialog('This student ID is already registered');
-        setState(() => _isLoading = false);
-        return;
+      // Save user data to Firestore
+      if (credential.user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(credential.user!.uid)
+            .set({
+              'name': _nameController.text.trim(),
+              'student_id': _studentIdController.text.trim().isEmpty
+                  ? null
+                  : _studentIdController.text.trim(),
+              'email': _emailController.text.trim().toLowerCase(),
+              'role': 'student',
+              'created_at': FieldValue.serverTimestamp(),
+            });
       }
-
-      // Check if email already exists
-      final existingEmail = await DatabaseHelper.instance.getUserByEmail(
-        _emailController.text.trim(),
-      );
-
-      if (existingEmail != null) {
-        _showErrorDialog('This email is already registered');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Create new student account
-      await DatabaseHelper.instance.createUser({
-        'name': _nameController.text.trim(),
-        'student_id': _studentIdController.text.trim(),
-        'email': _emailController.text.trim().toLowerCase(),
-        'password': _passwordController.text,
-        'role': 'student',
-        'created_at': DateTime.now().toIso8601String(),
-      });
 
       if (!mounted) return;
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎉 Account created successfully! Please login.'),
-          backgroundColor: Colors.green,
+          content: Text('Account created successfully! Please login.'),
+          backgroundColor: AppTheme.secondary,
         ),
       );
 
       // Navigate back to login
       Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        _showErrorDialog('The password provided is too weak.');
+      } else if (e.code == 'email-already-in-use') {
+        _showErrorDialog('The account already exists for that email.');
+      } else {
+        _showErrorDialog('Registration failed: ${e.message}');
+      }
     } catch (e) {
       _showErrorDialog('Registration failed: $e');
-      setState(() => _isLoading = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -105,18 +108,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  InputDecoration _buildInputDecoration(
+    String label,
+    IconData icon,
+    bool isDark,
+  ) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: AppTheme.textLight.withValues(alpha: 0.2),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: AppTheme.textLight.withValues(alpha: 0.2),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+      ),
+      filled: true,
+      fillColor: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Create Account'),
+        title: const Text(
+          'Create Account',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(32.0),
             child: Form(
               key: _formKey,
               child: Column(
@@ -125,7 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   // Welcome Message
                   Text(
-                    'Join TaskFlow! 🎓',
+                    'Join TaskFlow',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppTheme.primary,
                       fontWeight: FontWeight.bold,
@@ -136,21 +176,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     'Your personal academic assistant',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkTextLight
-                              : AppTheme.textLight,
-                        ),
+                      color: isDark ? Colors.white70 : AppTheme.textLight,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
 
                   // Name Input
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      prefixIcon: Icon(Icons.person_outline),
-                      hintText: 'e.g., John Doe',
+                    decoration: _buildInputDecoration(
+                      'Full Name',
+                      Icons.person_outline,
+                      isDark,
                     ),
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.next,
@@ -169,31 +207,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Student ID Input
                   TextFormField(
                     controller: _studentIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Student ID',
-                      prefixIcon: Icon(Icons.badge_outlined),
-                      hintText: 'e.g., STU123456',
+                    decoration: _buildInputDecoration(
+                      'Student ID (Optional)',
+                      Icons.badge_outlined,
+                      isDark,
                     ),
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your student ID';
-                      }
-                      if (value.trim().length < 4) {
-                        return 'Student ID must be at least 4 characters';
-                      }
-                      return null;
-                    },
+                    validator: null, // Optional field
                   ),
                   const SizedBox(height: 16),
 
                   // Email Input
                   TextFormField(
                     controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email Address',
-                      prefixIcon: Icon(Icons.email_outlined),
-                      hintText: 'e.g., john@university.edu',
+                    decoration: _buildInputDecoration(
+                      'Email Address',
+                      Icons.email_outlined,
+                      isDark,
                     ),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
@@ -201,7 +231,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter your email';
                       }
-                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      final emailRegex = RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      );
                       if (!emailRegex.hasMatch(value.trim())) {
                         return 'Please enter a valid email address';
                       }
@@ -213,18 +245,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Password Input
                   TextFormField(
                     controller: _passwordController,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showPassword ? Icons.visibility_off : Icons.visibility,
+                    decoration:
+                        _buildInputDecoration(
+                          'Password',
+                          Icons.lock_outline,
+                          isDark,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() => _showPassword = !_showPassword);
+                            },
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() => _showPassword = !_showPassword);
-                        },
-                      ),
-                    ),
                     obscureText: !_showPassword,
                     textInputAction: TextInputAction.next,
                     validator: (value) {
@@ -242,18 +279,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Confirm Password Input
                   TextFormField(
                     controller: _confirmPasswordController,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                    decoration:
+                        _buildInputDecoration(
+                          'Confirm Password',
+                          Icons.lock_outline,
+                          isDark,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(
+                                () => _showConfirmPassword =
+                                    !_showConfirmPassword,
+                              );
+                            },
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() => _showConfirmPassword = !_showConfirmPassword);
-                        },
-                      ),
-                    ),
                     obscureText: !_showConfirmPassword,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _register(),
@@ -270,45 +315,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
 
                   // Register Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _register,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _register,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Create Account',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            'Create Account',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Back to Login
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text.rich(
-                      TextSpan(
-                        text: 'Already have an account? ',
-                        style: const TextStyle(color: AppTheme.textLight),
-                        children: const [
-                          TextSpan(
-                            text: 'Login',
-                            style: TextStyle(
-                              color: AppTheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account? ',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : AppTheme.textLight,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                        ),
+                        child: const Text(
+                          'Login',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -319,4 +388,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-

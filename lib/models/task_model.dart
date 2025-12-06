@@ -32,48 +32,6 @@ class TaskModel {
     this.tagIds = const [],
   });
 
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory TaskModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return TaskModel(
-      id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      assigneeName: data['assigneeName'] ?? '',
-      assigneeId: data['assigneeId'],
-      priority: data['priority'] ?? 'medium',
-      status: data['status'] ?? 'todo',
-      deadline: (data['deadline'] as Timestamp).toDate(),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      createdBy: data['createdBy'] ?? '',
-      estimatedHours: data['estimatedHours']?.toDouble(),
-      category: data['category'],
-      tagIds: List<String>.from(data['tagIds'] ?? []),
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'title': title,
-      'description': description,
-      'assigneeName': assigneeName,
-      'assigneeId': assigneeId,
-      'priority': priority,
-      'status': status,
-      'deadline': Timestamp.fromDate(deadline),
-      'createdAt': Timestamp.fromDate(createdAt),
-      'createdBy': createdBy,
-      'estimatedHours': estimatedHours,
-      'category': category,
-      'tagIds': tagIds,
-    };
-  }
-  */
-
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -103,28 +61,6 @@ class TagModel {
     required this.color,
   });
 
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory TagModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return TagModel(
-      id: doc.id,
-      name: data['name'] ?? '',
-      color: data['color'] ?? '3b82f6',
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'name': name,
-      'color': color,
-    };
-  }
-  */
-
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -148,32 +84,6 @@ class SubtaskModel {
     required this.isCompleted,
     required this.createdAt,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory SubtaskModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return SubtaskModel(
-      id: doc.id,
-      taskId: data['taskId'] ?? '',
-      title: data['title'] ?? '',
-      isCompleted: data['isCompleted'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'taskId': taskId,
-      'title': title,
-      'isCompleted': isCompleted,
-      'createdAt': Timestamp.fromDate(createdAt),
-    };
-  }
-  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -204,36 +114,6 @@ class CommentModel {
     this.commentType = 'text',
     this.attachmentUrl,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory CommentModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return CommentModel(
-      id: doc.id,
-      taskId: data['taskId'] ?? '',
-      commentText: data['commentText'] ?? '',
-      reportedBy: data['reportedBy'] ?? '',
-      reportedAt: (data['reportedAt'] as Timestamp).toDate(),
-      commentType: data['commentType'] ?? 'text',
-      attachmentUrl: data['attachmentUrl'],
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'taskId': taskId,
-      'commentText': commentText,
-      'reportedBy': reportedBy,
-      'reportedAt': Timestamp.fromDate(reportedAt),
-      'commentType': commentType,
-      'attachmentUrl': attachmentUrl,
-    };
-  }
-  */
 
   Map<String, dynamic> toMap() {
     return {
@@ -268,38 +148,6 @@ class NotificationModel {
     this.isRead = false,
     required this.createdAt,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory NotificationModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return NotificationModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      title: data['title'] ?? '',
-      message: data['message'] ?? '',
-      type: data['type'] ?? '',
-      taskId: data['taskId'],
-      isRead: data['isRead'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'userId': userId,
-      'title': title,
-      'message': message,
-      'type': type,
-      'taskId': taskId,
-      'isRead': isRead,
-      'createdAt': Timestamp.fromDate(createdAt),
-    };
-  }
-  */
 
   Map<String, dynamic> toMap() {
     return {

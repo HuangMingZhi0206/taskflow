@@ -70,59 +70,36 @@ class CourseModel {
   }
 }
 
-/// Class Schedule - Recurring class times
+/// Class Schedule - Recurring class times or one-time events
 class ClassScheduleModel {
   final String id;
-  final String courseId;
+  final String? courseId; // Nullable for general events
   final String userId;
-  final String dayOfWeek; // 'monday', 'tuesday', etc.
-  final String startTime; // '09:00'
-  final String endTime; // '10:30'
+  final String dayOfWeek;
+  final String startTime;
+  final String endTime;
   final String? room;
+  final String? courseName; // Acts as "Title" for general events
+  final String? color;
   final bool isActive;
+  final String type; // 'course', 'general', or 'task'
+  final DateTime?
+  specificDate; // For one-time events (tasks), null for recurring
 
   ClassScheduleModel({
     required this.id,
-    required this.courseId,
+    this.courseId,
     required this.userId,
     required this.dayOfWeek,
     required this.startTime,
     required this.endTime,
     this.room,
+    this.courseName,
+    this.color,
     this.isActive = true,
+    this.type = 'course',
+    this.specificDate,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory ClassScheduleModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return ClassScheduleModel(
-      id: doc.id,
-      courseId: data['courseId'] ?? '',
-      userId: data['userId'] ?? '',
-      dayOfWeek: data['dayOfWeek'] ?? '',
-      startTime: data['startTime'] ?? '',
-      endTime: data['endTime'] ?? '',
-      room: data['room'],
-      isActive: data['isActive'] ?? true,
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'courseId': courseId,
-      'userId': userId,
-      'dayOfWeek': dayOfWeek,
-      'startTime': startTime,
-      'endTime': endTime,
-      'room': room,
-      'isActive': isActive,
-    };
-  }
-  */
 
   int get dayIndex {
     const days = {
@@ -146,7 +123,11 @@ class ClassScheduleModel {
       'start_time': startTime,
       'end_time': endTime,
       'room': room,
+      'course_name': courseName,
+      'color': color,
       'is_active': isActive ? 1 : 0,
+      'type': type,
+      'specific_date': specificDate?.toIso8601String(),
     };
   }
 
@@ -156,7 +137,16 @@ class ClassScheduleModel {
     String dayName = 'monday';
 
     if (dayNumber is int) {
-      const dayNames = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const dayNames = [
+        '',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ];
       if (dayNumber >= 1 && dayNumber <= 7) {
         dayName = dayNames[dayNumber];
       }
@@ -166,13 +156,21 @@ class ClassScheduleModel {
 
     return ClassScheduleModel(
       id: map['id']?.toString() ?? '',
-      courseId: map['course_id']?.toString() ?? map['id']?.toString() ?? '',
+      courseId: map['course_id']?.toString(), // Nullable
       userId: map['user_id']?.toString() ?? '',
       dayOfWeek: dayName,
       startTime: map['start_time']?.toString() ?? '00:00',
       endTime: map['end_time']?.toString() ?? '00:00',
       room: map['room']?.toString(),
+      courseName:
+          map['course_name']?.toString() ??
+          map['title']?.toString(), // Fallback to title
+      color: map['color']?.toString(),
       isActive: map['is_active'] == 1 || map['is_active'] == true,
+      type: map['type']?.toString() ?? 'course',
+      specificDate: map['specific_date'] != null
+          ? DateTime.tryParse(map['specific_date'].toString())
+          : null,
     );
   }
 }
@@ -200,41 +198,4 @@ class StudySessionModel {
     this.sessionType = 'pomodoro',
     this.notes,
   });
-
-  // Firebase disabled - fromFirestore method commented out
-  /*
-  factory StudySessionModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return StudySessionModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      courseId: data['courseId'],
-      taskId: data['taskId'],
-      startTime: (data['startTime'] as Timestamp).toDate(),
-      endTime: data['endTime'] != null
-          ? (data['endTime'] as Timestamp).toDate()
-          : null,
-      durationMinutes: data['durationMinutes'] ?? 0,
-      sessionType: data['sessionType'] ?? 'pomodoro',
-      notes: data['notes'],
-    );
-  }
-  */
-
-  // Firebase disabled - toFirestore method commented out
-  /*
-  Map<String, dynamic> toFirestore() {
-    return {
-      'userId': userId,
-      'courseId': courseId,
-      'taskId': taskId,
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': endTime != null ? Timestamp.fromDate(endTime!) : null,
-      'durationMinutes': durationMinutes,
-      'sessionType': sessionType,
-      'notes': notes,
-    };
-  }
-  */
 }
-

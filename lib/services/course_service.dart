@@ -1,11 +1,14 @@
-// SQLite-based Course Service
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course_model.dart';
-import '../database/database_helper.dart';
 
 class CourseService {
   static final CourseService instance = CourseService._init();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   CourseService._init();
+
+  CollectionReference get _courses => _firestore.collection('courses');
 
   // Create a new course
   Future<String> createCourse({
@@ -18,80 +21,107 @@ class CourseService {
     String? color,
   }) async {
     try {
-      final db = await DatabaseHelper.instance.database;
-      final courseId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      print('Creating course with userId: $userId (type: ${userId.runtimeType})');
-
-      await db.insert('courses', {
-        'id': courseId,
-        'user_id': userId.toString(), // Ensure it's a string
-        'course_code': courseCode.toString(),
-        'course_name': courseName.toString(),
-        'lecturer': instructor?.toString(),
-        'room': room?.toString(),
-        'day_of_week': 0, // Default integer
-        'start_time': '00:00', // Default string
-        'end_time': '00:00', // Default string
-        'color': (color ?? '3b82f6').toString(),
+      DocumentReference doc = await _courses.add({
+        'user_id': userId,
+        'course_code': courseCode,
+        'course_name': courseName,
+        'lecturer': instructor,
+        'room': room,
+        'day_of_week': 0,
+        'start_time': '00:00',
+        'end_time': '00:00',
+        'color': color ?? '3b82f6',
         'semester': null,
         'credits': null,
       });
-
-      print('Course created successfully with ID: $courseId');
-      return courseId;
-    } catch (e, stackTrace) {
-      print('Error creating course: $e');
-      print('Stack trace: $stackTrace');
+      await doc.update({'id': doc.id});
+      return doc.id;
+    } catch (e) {
+      debugPrint('Error creating course: $e');
       rethrow;
     }
   }
 
   // Get all courses for a user
   Future<List<CourseModel>> getUserCourses(String userId) async {
-    final db = await DatabaseHelper.instance.database;
-    final results = await db.query(
-      'courses',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'course_code ASC',
-    );
+    QuerySnapshot snapshot = await _courses
+        .where('user_id', isEqualTo: userId)
+        .where('day_of_week', isEqualTo: 0)
+        .get();
 
-    return results.map((map) => CourseModel.fromMap(map)).toList();
+    final courses = snapshot.docs.map((doc) {
+      var data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return CourseModel.fromMap(data);
+    }).toList();
+
+    // Sort by course code
+    courses.sort((a, b) => a.courseCode.compareTo(b.courseCode));
+    return courses;
   }
 
   // Get course by ID
   Future<CourseModel?> getCourseById(String courseId) async {
-    final db = await DatabaseHelper.instance.database;
-    final results = await db.query(
-      'courses',
-      where: 'id = ?',
-      whereArgs: [courseId],
-    );
-
-    if (results.isEmpty) return null;
-    return CourseModel.fromMap(results.first);
+    DocumentSnapshot doc = await _courses.doc(courseId).get();
+    if (doc.exists) {
+      var data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return CourseModel.fromMap(data);
+    }
+    return null;
   }
 
   // Update course
-  Future<void> updateCourse(String courseId, Map<String, dynamic> updates) async {
-    final db = await DatabaseHelper.instance.database;
-    await db.update(
-      'courses',
-      updates,
-      where: 'id = ?',
-      whereArgs: [courseId],
-    );
+  Future<void> updateCourse(
+    String courseId,
+    Map<String, dynamic> updates,
+  ) async {
+    await _courses.doc(courseId).update(updates);
   }
 
   // Delete course
   Future<void> deleteCourse(String courseId) async {
-    final db = await DatabaseHelper.instance.database;
-    await db.delete(
-      'courses',
-      where: 'id = ?',
-      whereArgs: [courseId],
-    );
+    await _courses.doc(courseId).delete();
+  }
+
+  // Add general schedule (non-course event)
+  Future<String> addGeneralSchedule({
+    required String userId,
+    required String title,
+    required String dayOfWeek,
+    required String startTime,
+    required String endTime,
+    String? room,
+    String? color,
+    String? description,
+  }) async {
+    // Map day name to number
+    final dayMap = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7,
+    };
+    final dayNumber = dayMap[dayOfWeek] ?? 1;
+
+    DocumentReference doc = await _courses.add({
+      'user_id': userId,
+      'course_name': title, // Use course_name field for title compatibility
+      'title': title,
+      'day_of_week': dayNumber,
+      'start_time': startTime,
+      'end_time': endTime,
+      'room': room,
+      'color': color ?? '64748b', // Default gray
+      'description': description,
+      'type': 'general',
+      'is_active': 1,
+    });
+    await doc.update({'id': doc.id});
+    return doc.id;
   }
 
   // Add class schedule (creates a new course entry with schedule)
@@ -103,16 +133,11 @@ class CourseService {
     required String endTime,
     String? room,
   }) async {
-    final db = await DatabaseHelper.instance.database;
-
     // Get the course details
     final course = await getCourseById(courseId);
     if (course == null) {
       throw Exception('Course not found');
     }
-
-    // Create a new schedule entry (separate row in courses table)
-    final scheduleId = DateTime.now().millisecondsSinceEpoch.toString();
 
     // Map day name to number
     final dayMap = {
@@ -127,8 +152,8 @@ class CourseService {
 
     final dayNumber = dayMap[dayOfWeek] ?? 1;
 
-    await db.insert('courses', {
-      'id': scheduleId,
+    DocumentReference doc = await _courses.add({
+      'course_id': courseId,
       'user_id': userId,
       'course_code': course.courseCode,
       'course_name': course.courseName,
@@ -140,32 +165,50 @@ class CourseService {
       'color': course.color,
       'semester': course.semester,
       'credits': course.credits,
+      'type': 'course',
+      'is_active': 1,
     });
+    await doc.update({'id': doc.id});
 
-    return scheduleId;
+    return doc.id;
   }
 
   // Get user's class schedules
   Future<List<ClassScheduleModel>> getUserSchedules(String userId) async {
-    final db = await DatabaseHelper.instance.database;
-    final results = await db.query(
-      'courses',
-      where: 'user_id = ? AND day_of_week > 0',
-      whereArgs: [userId],
-      orderBy: 'day_of_week ASC, start_time ASC',
-    );
+    // Fetch all records for the user to avoid composite index requirements
+    QuerySnapshot snapshot = await _courses
+        .where('user_id', isEqualTo: userId)
+        .get();
 
-    return results.map((map) => ClassScheduleModel.fromMap(map)).toList();
+    final allSchedules = snapshot.docs
+        .map((doc) {
+          var data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          // Handle potential integer/string mismatch for day_of_week here if needed
+          // But strictly we only want items where day_of_week > 0
+          if (data['day_of_week'] == null ||
+              (data['day_of_week'] is int &&
+                  (data['day_of_week'] as int) == 0)) {
+            return null;
+          }
+          return ClassScheduleModel.fromMap(data);
+        })
+        .whereType<ClassScheduleModel>()
+        .toList();
+
+    // Sort manually since we removed the DB sort
+    allSchedules.sort((a, b) {
+      if (a.dayIndex != b.dayIndex) {
+        return a.dayIndex.compareTo(b.dayIndex);
+      }
+      return a.startTime.compareTo(b.startTime);
+    });
+
+    return allSchedules;
   }
 
   // Delete class schedule
   Future<void> deleteClassSchedule(String scheduleId) async {
-    final db = await DatabaseHelper.instance.database;
-    await db.delete(
-      'courses',
-      where: 'id = ?',
-      whereArgs: [scheduleId],
-    );
+    await _courses.doc(scheduleId).delete();
   }
 }
-

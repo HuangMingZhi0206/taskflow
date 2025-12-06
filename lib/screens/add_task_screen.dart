@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../database/database_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 
 class AddTaskScreen extends StatefulWidget {
@@ -20,16 +21,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   String _selectedPriority = 'medium';
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 7));
-  final List<int> _selectedTags = [];
-  List<Map<String, dynamic>> _allTags = [];
-
   bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTags();
-  }
 
   @override
   void dispose() {
@@ -39,23 +31,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     super.dispose();
   }
 
-  Future<void> _loadTags() async {
-    try {
-      final tags = await DatabaseHelper.instance.getAllTags();
-      setState(() {
-        _allTags = tags;
-      });
-    } catch (e) {
-      _showErrorDialog('Error loading tags: $e');
-    }
-  }
-
   Future<void> _selectDeadline() async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDeadline,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              onSurface: AppTheme.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null && picked != _selectedDeadline) {
@@ -88,35 +81,38 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
     setState(() => _isLoading = true);
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      _showErrorDialog('You must be logged in to create a task.');
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       final task = {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'assignee_name': widget.user['name'],
-        'assignee_id': widget.user['id'],
+        'userId': currentUser.uid,
         'priority': _selectedPriority,
         'status': 'todo',
-        'deadline': _selectedDeadline.toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-        'created_by': widget.user['id'],
+        'deadline': Timestamp.fromDate(_selectedDeadline),
+        'created_at': FieldValue.serverTimestamp(),
+        'created_by': currentUser.uid,
+        'tags': [],
         'estimated_hours': _estimatedHoursController.text.isNotEmpty
             ? double.tryParse(_estimatedHoursController.text)
             : null,
       };
 
-      final taskId = await DatabaseHelper.instance.createTask(task);
-
-      // Add selected tags to the task
-      for (final tagId in _selectedTags) {
-        await DatabaseHelper.instance.addTaskTag(taskId, tagId);
-      }
+      await FirebaseFirestore.instance.collection('tasks').add(task);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Task created! You got this! 💪'),
-          backgroundColor: Colors.green,
+          content: Text('Task created successfully'),
+          backgroundColor: AppTheme.secondary,
         ),
       );
 
@@ -127,24 +123,64 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
   }
 
+  InputDecoration _buildInputDecoration(
+    String label,
+    IconData icon,
+    bool isDark,
+  ) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: AppTheme.textLight),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: AppTheme.textLight.withValues(alpha: 0.2),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: AppTheme.textLight.withValues(alpha: 0.2),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+      ),
+      filled: true,
+      fillColor: isDark ? AppTheme.darkSurface : Colors.white,
+      labelStyle: TextStyle(color: AppTheme.textLight),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Create New Task'),
+        title: const Text(
+          'Create New Task',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? Colors.white : AppTheme.textPrimary,
+        elevation: 0,
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           children: [
             // Title Input
             TextFormField(
               controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Task Title',
-                hintText: 'Enter task title',
-                prefixIcon: Icon(Icons.title),
+              decoration: _buildInputDecoration(
+                'Task Title',
+                Icons.title,
+                isDark,
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -153,17 +189,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Description Input
             TextFormField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Enter task description',
-                prefixIcon: Icon(Icons.description),
-                alignLabelWithHint: true,
-              ),
+              decoration: _buildInputDecoration(
+                'Description',
+                Icons.description_outlined,
+                isDark,
+              ).copyWith(alignLabelWithHint: true),
               maxLines: 4,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -172,15 +207,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Estimated Hours Input
             TextFormField(
               controller: _estimatedHoursController,
-              decoration: const InputDecoration(
-                labelText: 'Estimated Hours (Optional)',
-                hintText: 'e.g., 8 or 16',
-                prefixIcon: Icon(Icons.access_time),
+              decoration: _buildInputDecoration(
+                'Estimated Hours (Optional)',
+                Icons.access_time,
+                isDark,
               ),
               keyboardType: TextInputType.number,
               validator: (value) {
@@ -193,35 +228,53 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Priority Selection
             Text(
               'Priority',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppTheme.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: _buildPriorityCard('urgent', 'Urgent', AppTheme.urgent),
+                  child: _buildPriorityCard(
+                    'urgent',
+                    'Urgent',
+                    AppTheme.urgent,
+                    isDark,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _buildPriorityCard('medium', 'Medium', AppTheme.medium),
+                  child: _buildPriorityCard(
+                    'medium',
+                    'Medium',
+                    AppTheme.medium,
+                    isDark,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _buildPriorityCard('low', 'Low', AppTheme.low),
+                  child: _buildPriorityCard('low', 'Low', AppTheme.low, isDark),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Deadline Selection
             Text(
               'Deadline',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppTheme.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
             InkWell(
@@ -230,68 +283,72 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? AppTheme.darkSurface : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.textLight.withValues(alpha: 0.3),
+                    color: AppTheme.textLight.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, color: AppTheme.primary),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      color: AppTheme.primary,
+                    ),
                     const SizedBox(width: 12),
                     Text(
                       DateFormat('MMMM dd, yyyy').format(_selectedDeadline),
-                      style: const TextStyle(fontSize: 16),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDark ? Colors.white : AppTheme.textPrimary,
+                      ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.arrow_forward_ios, size: 16),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: AppTheme.textLight,
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Course/Category Tags
-            Text(
-              'Course Tags (Optional)',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            if (_allTags.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('No tags available'),
-                ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _allTags.map((tag) => _buildTagChip(tag)).toList(),
-              ),
             const SizedBox(height: 32),
 
+            const SizedBox(height: 16),
+
             // Create Button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _createTask,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _createTask,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Text(
+                        'Create Task',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    )
-                  : const Text(
-                      'Create Task',
-                      style: TextStyle(fontSize: 16),
-                    ),
+              ),
             ),
           ],
         ),
@@ -299,37 +356,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
   }
 
-  Widget _buildTagChip(Map<String, dynamic> tag) {
-    final isSelected = _selectedTags.contains(tag['id']);
-    final color = Color(int.parse('0xff${tag['color']}'));
-
-    return FilterChip(
-      label: Text(tag['name']),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _selectedTags.add(tag['id']);
-          } else {
-            _selectedTags.remove(tag['id']);
-          }
-        });
-      },
-      backgroundColor: Colors.white,
-      selectedColor: color.withValues(alpha: 0.2),
-      checkmarkColor: color,
-      labelStyle: TextStyle(
-        color: isSelected ? color : AppTheme.textPrimary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
-      side: BorderSide(
-        color: isSelected ? color : AppTheme.textLight.withValues(alpha: 0.3),
-        width: isSelected ? 2 : 1,
-      ),
-    );
-  }
-
-  Widget _buildPriorityCard(String value, String label, Color color) {
+  Widget _buildPriorityCard(
+    String value,
+    String label,
+    Color color,
+    bool isDark,
+  ) {
     final isSelected = _selectedPriority == value;
     return InkWell(
       onTap: () {
@@ -341,27 +373,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : (isDark ? AppTheme.darkSurface : Colors.white),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : AppTheme.textLight.withValues(alpha: 0.3),
+            color: isSelected
+                ? color
+                : AppTheme.textLight.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _getPriorityIcon(value),
-                color: color,
-                size: 24,
-              ),
+            Icon(
+              _getPriorityIcon(value),
+              color: isSelected ? color : AppTheme.textLight,
+              size: 24,
             ),
             const SizedBox(height: 8),
             Text(
@@ -369,7 +397,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : AppTheme.textPrimary,
+                color: isSelected ? color : AppTheme.textLight,
               ),
             ),
           ],
@@ -381,14 +409,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   IconData _getPriorityIcon(String priority) {
     switch (priority) {
       case 'urgent':
-        return Icons.warning;
+        return Icons.warning_amber_rounded;
       case 'medium':
-        return Icons.info;
+        return Icons.info_outline_rounded;
       case 'low':
-        return Icons.check_circle;
+        return Icons.check_circle_outline_rounded;
       default:
-        return Icons.info;
+        return Icons.info_outline_rounded;
     }
   }
 }
-
