@@ -734,12 +734,33 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   void _confirmDeleteSchedule(String scheduleId) {
+    final scheduleItem = _schedules.firstWhere(
+      (s) => s.id == scheduleId,
+      orElse: () => ClassScheduleModel(
+        id: 'unknown',
+        userId: '',
+        courseName: '',
+        dayOfWeek: '',
+        startTime: '',
+        endTime: '',
+        color: '',
+        type: 'unknown',
+        isActive: false,
+      ),
+    );
+
+    if (scheduleItem.id == 'unknown') return;
+
+    final isTask = scheduleItem.type == 'task';
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Class'),
-        content: const Text(
-          'Are you sure you want to remove this class from your schedule?',
+        title: Text(isTask ? 'Delete Task' : 'Delete Class'),
+        content: Text(
+          isTask
+              ? 'Are you sure you want to delete this task?'
+              : 'Are you sure you want to remove this class from your schedule?',
         ),
         actions: [
           TextButton(
@@ -750,11 +771,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
-                await CourseService.instance.deleteClassSchedule(scheduleId);
+                if (isTask) {
+                  await FirebaseFirestore.instance
+                      .collection('tasks')
+                      .doc(scheduleId)
+                      .delete();
+                } else {
+                  await CourseService.instance.deleteClassSchedule(scheduleId);
+                }
+
                 if (!mounted) return;
                 _loadSchedule();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Class removed from schedule')),
+                  SnackBar(
+                    content: Text(
+                      isTask
+                          ? 'Task deleted successfully'
+                          : 'Class removed from schedule',
+                    ),
+                  ),
                 );
               } catch (e) {
                 if (mounted) {

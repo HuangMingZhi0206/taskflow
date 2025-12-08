@@ -570,14 +570,13 @@ class _DashboardHomeState extends State<DashboardHome> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (widget.user['role'] == 'manager')
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 20),
-                          color: AppTheme.textLight,
-                          onPressed: () => _deleteTask(task['id']),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        color: AppTheme.textLight,
+                        onPressed: () => _deleteTask(task['id']),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
