@@ -68,9 +68,60 @@ In Task detail the user have to click the button "Start Task" to update the stat
      width="400" 
      alt="WhatsApp Screenshot 22:35:58">
 
+## Calendar
+The user can see their task rather in a day, week, or month. This calendar helping the user to see the task that close into deadline.
 
+### In a day
 
+<img src="https://github.com/user-attachments/assets/35b50bf7-6fc4-4c28-a665-5a3d66d2c9f9" 
+     width="400" 
+     alt="WhatsApp Screenshot 06:40">
 
+### In a week
 
+<img src="https://github.com/user-attachments/assets/cbc6b4b2-301d-4c06-aef3-287b9a80e56c" 
+     width="400" 
+     alt="WhatsApp Screenshot 06:40">
 
+### In a month
+
+<img src="https://github.com/user-attachments/assets/e04d06dd-acc6-45ee-bc97-aa7f734c4a1c" 
+     width="400" 
+     alt="WhatsApp Screenshot 06:40">
+
+## Pomodoro
+This section is designed to help users manage their time for completing tasks. They can set their focus time, short breaks, and long breaks. If the user want to costomize the time, they can click the top right buttton to customize the time.
+
+### The UI
+<img src="https://github.com/user-attachments/assets/91a758a8-d46b-49f2-b23e-3e163029928c" 
+     width="400" 
+     alt="WhatsApp Screenshot 06:54">
+
+### Customize the timer
+<img src="https://github.com/user-attachments/assets/92654769-5b79-4d8f-b35b-e973b45c398b" 
+     width="400" 
+     alt="WhatsApp Screenshot 06:54">
+
+### Notification when the timer is up
+
+<img src="https://github.com/user-attachments/assets/af481ba6-299c-4610-b6b5-6cef84abeb6d" 
+     width="400" 
+     alt="WhatsApp Screenshot 07:08">
+
+## Settingss
+This section to see the users profile. User can change the profile picture, also they can change their name if they wanted to change into short name or anything else.
+Users also can shange their password, and do log out if they want.
+
+### The UI
+<img src="https://github.com/user-attachments/assets/37c08ded-778f-476e-8b51-7e44788c9705" 
+     width="400" 
+     alt="WhatsApp Screenshot 07:14">
+
+### Appearance
+
+make the users can change the theme that user likes more.
+
+<img src="https://github.com/user-attachments/assets/37c08ded-778f-476e-8b51-7e44788c9705" 
+     width="400" 
+     alt="WhatsApp Screenshot 07:14">
 
