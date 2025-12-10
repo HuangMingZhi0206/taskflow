@@ -121,7 +121,7 @@ Users also can shange their password, and do log out if they want.
 
 make the users can change the theme that user likes more.
 
-<img src="https://github.com/user-attachments/assets/37c08ded-778f-476e-8b51-7e44788c9705" 
+<img src="https://github.com/user-attachments/assets/d2e391f7-0252-44cc-98ae-98f12ddca7f2" 
      width="400" 
      alt="WhatsApp Screenshot 07:14">
 
