@@ -542,6 +542,40 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   if (time != null) setState(() => endTime = time);
                 },
               ),
+              // Show warning if end time is before or equal to start time
+              if (startTime != null && endTime != null)
+                Builder(
+                  builder: (context) {
+                    final startMinutes = startTime!.hour * 60 + startTime!.minute;
+                    final endMinutes = endTime!.hour * 60 + endTime!.minute;
+                    final isInvalid = endMinutes <= startMinutes;
+
+                    return isInvalid
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Colors.red[700],
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'End time must be after start time',
+                                    style: TextStyle(
+                                      color: Colors.red[700],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink();
+                  },
+                ),
             ],
           ),
           actions: [
@@ -556,6 +590,20 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     endTime == null) {
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(content: Text('Please fill all fields')),
+                  );
+                  return;
+                }
+
+                // Validate time: End time must be after start time
+                final startMinutes = startTime!.hour * 60 + startTime!.minute;
+                final endMinutes = endTime!.hour * 60 + endTime!.minute;
+
+                if (endMinutes <= startMinutes) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('End time must be after start time'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                   return;
                 }

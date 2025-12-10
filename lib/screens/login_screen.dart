@@ -65,15 +65,25 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        _showSnackBar(
-          'Invalid credentials. Please check your email and password.',
-        );
+      String message;
+      if (e.code == 'user-not-found') {
+        message = '❌ No account found with this email address.';
+      } else if (e.code == 'wrong-password') {
+        message = '❌ Incorrect password. Please try again or reset your password.';
+      } else if (e.code == 'invalid-email') {
+        message = '❌ Invalid email address format.';
+      } else if (e.code == 'user-disabled') {
+        message = '❌ This account has been disabled.';
+      } else if (e.code == 'too-many-requests') {
+        message = '❌ Too many failed attempts. Please try again later.';
+      } else if (e.code == 'invalid-credential') {
+        message = '❌ Invalid email or password. Please check your credentials.';
       } else {
-        _showSnackBar('An error occurred: ${e.message}');
+        message = '❌ ${e.message ?? "Login failed"}';
       }
+      _showSnackBar(message, isError: true);
     } catch (e) {
-      _showSnackBar('An error occurred: $e');
+      _showSnackBar('❌ An unexpected error occurred', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -81,12 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppTheme.secondary,
+        backgroundColor: isError ? AppTheme.urgent : AppTheme.secondary,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -204,7 +214,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _login(),
                 ),
-                const SizedBox(height: 32),
+
+                // Forgot Password Link
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/forgot-password');
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 8,
+                      ),
+                    ),
+                    child: const Text(
+                      'Forgot Password?',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 // Login Button
                 SizedBox(

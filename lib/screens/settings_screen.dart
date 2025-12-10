@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_service.dart';
 import '../services/preferences_service.dart';
 import '../theme/app_theme.dart';
@@ -35,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _nameController = TextEditingController(text: widget.user['name']);
+    _loadProfileImage();
   }
 
   late TextEditingController _nameController;
@@ -381,7 +383,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   // ===== APPEARANCE TAB =====
-  // ===== APPEARANCE TAB =====
   Widget _buildAppearanceTab(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -412,16 +413,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                 'Dark Mode',
                 'Easy on the eyes',
                 Icons.dark_mode_outlined,
-              ),
-              Divider(
-                height: 1,
-                color: AppTheme.textLight.withValues(alpha: 0.1),
-              ),
-              _buildThemeOption(
-                ThemeMode.system,
-                'System Default',
-                'Follow device settings',
-                Icons.brightness_auto_outlined,
               ),
             ],
           ),
@@ -732,14 +723,41 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final imagePath = prefs.getString('profile_image_${widget.user['id']}');
+      if (imagePath != null && imagePath.isNotEmpty) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          setState(() {
+            _profileImage = file;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile image: $e');
+    }
+  }
+
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
       if (image != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_image_${widget.user['id']}', image.path);
+
         setState(() {
           _profileImage = File(image.path);
         });
-        _showSnackBar('Profile photo updated');
+
+        _showSnackBar('Profile photo updated successfully');
       }
     } catch (e) {
       _showSnackBar('Failed to pick image: $e');

@@ -803,10 +803,48 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final isSelected = _commentType == type;
     return GestureDetector(
       onTap: () {
+        // Show under development for file upload
+        if (type == 'file') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.construction,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '🚧 File Upload - Under Development\nComing Soon!',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange.shade700,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              action: SnackBarAction(
+                label: 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ),
+            ),
+          );
+          return;
+        }
+
         setState(() {
           _commentType = type;
-          if (type != 'file') {
-            _clearAttachment();
+          // Clear attachment only when switching away from file type
+          if (type != 'file' && _selectedFilePath != null) {
+            _selectedFilePath = null;
+            _selectedFileName = null;
           }
         });
       },
@@ -836,6 +874,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
+            if (type == 'file')
+              Container(
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Soon',
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: Colors.orange.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

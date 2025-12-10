@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 import '../theme/app_theme.dart';
 import '../services/theme_service.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
@@ -20,15 +22,40 @@ class DashboardHome extends StatefulWidget {
   State<DashboardHome> createState() => _DashboardHomeState();
 }
 
-class _DashboardHomeState extends State<DashboardHome> {
+class _DashboardHomeState extends State<DashboardHome> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _tasks = [];
   List<Map<String, dynamic>> _filteredTasks = [];
   bool _isLoading = true;
   String _selectedFilter = 'all';
+  File? _profileImage;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadTasks();
+    _loadProfileImage();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Reload tasks when app resumes
+      _loadTasks();
+      _loadProfileImage();
+    }
+  }
+
+  @override
+  void didUpdateWidget(DashboardHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload tasks when widget updates
     _loadTasks();
   }
 
@@ -84,6 +111,23 @@ class _DashboardHomeState extends State<DashboardHome> {
       _selectedFilter = filter;
       _applyFilter();
     });
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final imagePath = prefs.getString('profile_image_${widget.user['id']}');
+      if (imagePath != null && imagePath.isNotEmpty) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          setState(() {
+            _profileImage = file;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile image: $e');
+    }
   }
 
   Widget _buildModernStatCard(String value, String label, IconData icon) {
@@ -301,16 +345,45 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     ),
                                 ],
                               ),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.person_outline,
-                                  color: Colors.white,
-                                  size: 28,
+                              // Profile Image
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/settings',
+                                    arguments: widget.user,
+                                  );
+                                },
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.3),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: _profileImage != null
+                                        ? Image.file(
+                                            _profileImage!,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Center(
+                                            child: Text(
+                                              widget.user['name'][0]
+                                                  .toUpperCase(),
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             ],

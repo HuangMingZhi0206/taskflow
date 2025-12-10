@@ -4,9 +4,11 @@ import 'config/app_config.dart';
 import 'theme/app_theme.dart';
 import 'services/theme_service.dart';
 import 'services/preferences_service.dart';
+import 'services/notification_service.dart';
 import 'widgets/auth_wrapper.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/dashboard_home.dart';
 import 'screens/add_task_screen.dart';
 import 'screens/task_detail_screen.dart';
@@ -19,6 +21,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
+
+  // Initialize notification service
+  await NotificationService.instance.initialize();
 
   // Print app configuration
   AppConfig.printConfig();
@@ -96,6 +101,9 @@ class _MyAppState extends State<MyApp> {
 
           case '/register':
             return MaterialPageRoute(builder: (_) => const RegisterScreen());
+
+          case '/forgot-password':
+            return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
 
           case '/dashboard':
             final user = settings.arguments as Map<String, dynamic>;

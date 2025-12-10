@@ -34,8 +34,19 @@ class ScheduleWeekView extends StatelessWidget {
 
           // Sort by start time
           daySchedules.sort(
-            (a, b) =>
-                _parseTime(a.startTime).compareTo(_parseTime(b.startTime)),
+            (a, b) {
+              final startComparison = _parseTime(a.startTime).compareTo(_parseTime(b.startTime));
+              if (startComparison == 0) {
+                // Validate that end time is not earlier than start time
+                if (_parseTime(a.endTime) < _parseTime(a.startTime)) {
+                  throw ArgumentError('End time cannot be earlier than start time for schedule: \\${a.courseName}');
+                }
+                if (_parseTime(b.endTime) < _parseTime(b.startTime)) {
+                  throw ArgumentError('End time cannot be earlier than start time for schedule: \\${b.courseName}');
+                }
+              }
+              return startComparison;
+            },
           );
 
           return Container(
@@ -230,7 +241,7 @@ class ScheduleMonthView extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              childAspectRatio: 0.8,
+              childAspectRatio: 0.65, // Increased height for task titles
             ),
             itemCount: daysInMonth + emptySlots,
             itemBuilder: (context, index) {
@@ -240,13 +251,33 @@ class ScheduleMonthView extends StatelessWidget {
               final day = index - emptySlots + 1;
               final date = DateTime(focusedDate.year, focusedDate.month, day);
               final dayName = _getDayName(date.weekday);
-              final eventsForDay = schedules
-                  .where(
-                    (s) =>
-                        s.dayOfWeek.trim().toLowerCase() ==
-                        dayName.toLowerCase(),
-                  )
-                  .toList();
+              final normalizedDate = DateTime(date.year, date.month, date.day);
+
+              // Get events for this specific day
+              final allEventsForDay = schedules.where((s) {
+                // If event has a specific date, check exact date match
+                if (s.specificDate != null) {
+                  final scheduleDate = DateTime(
+                    s.specificDate!.year,
+                    s.specificDate!.month,
+                    s.specificDate!.day,
+                  );
+                  return scheduleDate == normalizedDate;
+                }
+                // Otherwise, check recurring events by day of week
+                return s.dayOfWeek.trim().toLowerCase() == dayName.toLowerCase();
+              }).toList();
+
+              // Deduplicate: keep only unique courses
+              final Map<String, ClassScheduleModel> uniqueEvents = {};
+              for (var event in allEventsForDay) {
+                final key = event.courseId ?? event.courseName ?? event.id;
+                if (!uniqueEvents.containsKey(key)) {
+                  uniqueEvents[key] = event;
+                }
+              }
+              final eventsForDay = uniqueEvents.values.toList();
+
               final isToday = isSameDay(date, DateTime.now());
 
               return GestureDetector(
@@ -263,32 +294,69 @@ class ScheduleMonthView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '$day',
-                        style: TextStyle(
-                          fontWeight: isToday
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isToday ? AppTheme.primary : null,
+                      Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Text(
+                          '$day',
+                          style: TextStyle(
+                            fontWeight: isToday
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isToday ? AppTheme.primary : null,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 2),
                       if (eventsForDay.isNotEmpty)
                         Expanded(
-                          child: Wrap(
-                            spacing: 2,
-                            runSpacing: 2,
-                            children: eventsForDay.take(3).map((e) {
-                              return Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _getColor(e),
-                                ),
-                              );
-                            }).toList(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2.0,
+                              vertical: 2.0,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: eventsForDay.take(2).map((event) {
+                                final color = _getColor(event);
+                                final title = event.courseName ?? 'Event';
+                                return Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 1),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      if (eventsForDay.length > 2)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
+                          child: Text(
+                            '+${eventsForDay.length - 2}',
+                            style: TextStyle(
+                              fontSize: 7,
+                              color: AppTheme.textLight,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                     ],

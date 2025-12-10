@@ -184,27 +184,78 @@ class CourseService {
         .map((doc) {
           var data = doc.data() as Map<String, dynamic>;
           data['id'] = doc.id;
-          // Handle potential integer/string mismatch for day_of_week here if needed
-          // But strictly we only want items where day_of_week > 0
-          if (data['day_of_week'] == null ||
-              (data['day_of_week'] is int &&
-                  (data['day_of_week'] as int) == 0)) {
+
+          // Include if:
+          // 1. Has day_of_week > 0 (recurring schedule), OR
+          // 2. Has specific_date (one-time event/task)
+          final dayOfWeek = data['day_of_week'];
+          final hasSpecificDate = data['specific_date'] != null;
+
+          if (dayOfWeek == null ||
+              (dayOfWeek is int && dayOfWeek == 0 && !hasSpecificDate)) {
+            return null; // Skip courses without schedule
+          }
+
+          try {
+            return ClassScheduleModel.fromMap(data);
+          } catch (e) {
+            debugPrint('Error parsing schedule: $e');
             return null;
           }
-          return ClassScheduleModel.fromMap(data);
         })
         .whereType<ClassScheduleModel>()
         .toList();
 
     // Sort manually since we removed the DB sort
     allSchedules.sort((a, b) {
+      // If both have specific dates, sort by date
+      if (a.specificDate != null && b.specificDate != null) {
+        final dateCompare = a.specificDate!.compareTo(b.specificDate!);
+        if (dateCompare != 0) return dateCompare;
+        return _compareTime(a.startTime, b.startTime);
+      }
+
+      // Specific dates come before recurring events
+      if (a.specificDate != null) return -1;
+      if (b.specificDate != null) return 1;
+
+      // Both are recurring, sort by day then time
       if (a.dayIndex != b.dayIndex) {
         return a.dayIndex.compareTo(b.dayIndex);
       }
-      return a.startTime.compareTo(b.startTime);
+      return _compareTime(a.startTime, b.startTime);
     });
 
     return allSchedules;
+  }
+
+  int _compareTime(String timeA, String timeB) {
+    try {
+      final a = _parseTimeToMinutes(timeA);
+      final b = _parseTimeToMinutes(timeB);
+      return a.compareTo(b);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  int _parseTimeToMinutes(String time) {
+    try {
+      final parts = time.trim().split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      if (parts.length > 1) {
+        final isPM = parts[1].toUpperCase() == 'PM';
+        if (isPM && hour != 12) hour += 12;
+        if (!isPM && hour == 12) hour = 0;
+      }
+
+      return hour * 60 + minute;
+    } catch (e) {
+      return 0;
+    }
   }
 
   // Delete class schedule

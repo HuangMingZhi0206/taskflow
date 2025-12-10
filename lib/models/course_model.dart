@@ -154,13 +154,31 @@ class ClassScheduleModel {
       dayName = dayNumber.toLowerCase();
     }
 
+    // Smart time handling for tasks
+    String startTimeStr = map['start_time']?.toString() ?? '00:00';
+    String endTimeStr = map['end_time']?.toString() ?? '00:00';
+
+    // If it's a task with midnight time (00:00 or 12:00 AM), default to 9:00 AM
+    final isTask = map['type']?.toString() == 'task';
+    final hasSpecificDate = map['specific_date'] != null;
+
+    if (isTask && hasSpecificDate) {
+      // Check if time is midnight/unspecified
+      if (startTimeStr == '00:00' ||
+          startTimeStr == '0:00' ||
+          startTimeStr.contains('12:00 AM')) {
+        startTimeStr = '9:00 AM';
+        endTimeStr = '10:00 AM';
+      }
+    }
+
     return ClassScheduleModel(
       id: map['id']?.toString() ?? '',
       courseId: map['course_id']?.toString(), // Nullable
       userId: map['user_id']?.toString() ?? '',
       dayOfWeek: dayName,
-      startTime: map['start_time']?.toString() ?? '00:00',
-      endTime: map['end_time']?.toString() ?? '00:00',
+      startTime: startTimeStr,
+      endTime: endTimeStr,
       room: map['room']?.toString(),
       courseName:
           map['course_name']?.toString() ??
@@ -198,4 +216,32 @@ class StudySessionModel {
     this.sessionType = 'pomodoro',
     this.notes,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'course_id': courseId,
+      'task_id': taskId,
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime?.toIso8601String(),
+      'duration_minutes': durationMinutes,
+      'session_type': sessionType,
+      'notes': notes,
+    };
+  }
+
+  factory StudySessionModel.fromMap(Map<String, dynamic> map) {
+    return StudySessionModel(
+      id: map['id']?.toString() ?? '',
+      userId: map['user_id']?.toString() ?? '',
+      courseId: map['course_id']?.toString(),
+      taskId: map['task_id']?.toString(),
+      startTime: DateTime.parse(map['start_time']),
+      endTime: map['end_time'] != null ? DateTime.parse(map['end_time']) : null,
+      durationMinutes: map['duration_minutes'] ?? 0,
+      sessionType: map['session_type'] ?? 'pomodoro',
+      notes: map['notes']?.toString(),
+    );
+  }
 }

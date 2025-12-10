@@ -5,7 +5,7 @@ import '../services/course_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
 import '../widgets/schedule_views.dart';
-import '../widgets/schedule_day_view.dart';
+import '../widgets/google_calendar_views.dart';
 
 enum ViewMode { day, week, month }
 
@@ -96,22 +96,43 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               color = '10b981';
             }
 
-            return ClassScheduleModel(
+            // Use a reasonable default time (9 AM) if deadline is just a date
+            // This ensures tasks are visible in day/week views
+            DateTime taskStartTime = dueDate;
+            if (taskStartTime.hour == 0 && taskStartTime.minute == 0) {
+              taskStartTime = DateTime(
+                dueDate.year,
+                dueDate.month,
+                dueDate.day,
+                9, // Default to 9 AM
+                0,
+              );
+            }
+
+            debugPrint('Task: ${data['title']}, Time: ${_formatTime(taskStartTime)}, Date: ${DateTime(dueDate.year, dueDate.month, dueDate.day)}');
+
+            final taskModel = ClassScheduleModel(
               id: doc.id,
               userId: userId,
               courseId: null,
               courseName: data['title'] ?? 'Untitled Task',
               dayOfWeek: dayName,
-              startTime: _formatTime(dueDate),
-              endTime: _formatTime(dueDate.add(const Duration(hours: 1))),
+              startTime: _formatTime(taskStartTime),
+              endTime: _formatTime(taskStartTime.add(const Duration(hours: 1))),
               color: color,
               type: 'task',
               isActive: true,
               specificDate: DateTime(dueDate.year, dueDate.month, dueDate.day),
             );
+
+            debugPrint('Created task model: ${taskModel.courseName}, start: ${taskModel.startTime}, type: ${taskModel.type}, specificDate: ${taskModel.specificDate}');
+            return taskModel;
           })
           .whereType<ClassScheduleModel>()
           .toList();
+
+      debugPrint('Loaded ${schedules.length} schedules and ${taskEvents.length} tasks');
+      debugPrint('Sample task events: ${taskEvents.take(3).map((t) => '${t.courseName} at ${t.startTime}').join(', ')}');
 
       if (!mounted) return;
 
@@ -137,38 +158,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return '$displayHour:${minute.toString().padLeft(2, '0')} $period';
   }
 
-  List<ClassScheduleModel> _getSchedulesForDate(DateTime date) {
-    // Map weekday number to string names stored in DB
-    // 1=Mon, ..., 7=Sun
-    final dayNames = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    final dayName = dayNames[date.weekday - 1];
-
-    // Normalize date to midnight for comparison
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-
-    return _schedules.where((s) {
-      // For one-time events (tasks), check specific date
-      if (s.specificDate != null) {
-        final scheduleDate = DateTime(
-          s.specificDate!.year,
-          s.specificDate!.month,
-          s.specificDate!.day,
-        );
-        return scheduleDate == normalizedDate;
-      }
-
-      // For recurring events (classes), check day of week
-      return s.dayOfWeek.trim().toLowerCase() == dayName.trim().toLowerCase();
-    }).toList();
-  }
 
   // View Modes
   ViewMode _viewMode = ViewMode.day;
@@ -258,8 +247,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
           PopupMenuButton<ViewMode>(
             icon: const Icon(
-              Icons.calendar_month,
-            ), // Calendar icon for View Mode
+              Icons.calendar_view_month,
+            ),
             onSelected: (mode) => setState(() => _viewMode = mode),
             itemBuilder: (context) => [
               const PopupMenuItem(value: ViewMode.day, child: Text('Day View')),
@@ -528,6 +517,37 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                 ],
               ),
+              // Show warning if end time is before or equal to start time
+              Builder(
+                builder: (context) {
+                  final startMinutes = startTime.hour * 60 + startTime.minute;
+                  final endMinutes = endTime.hour * 60 + endTime.minute;
+                  final isInvalid = endMinutes <= startMinutes;
+
+                  return isInvalid
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.red[700],
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'End time must be after start time',
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink();
+                },
+              ),
               const SizedBox(height: 16),
 
               TextField(
@@ -543,6 +563,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 child: ElevatedButton(
                   onPressed: () async {
                     try {
+                      // Validate time: End time must be after start time
+                      final startMinutes = startTime.hour * 60 + startTime.minute;
+                      final endMinutes = endTime.hour * 60 + endTime.minute;
+
+                      if (endMinutes <= startMinutes) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('End time must be after start time'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
                       if (isGeneralEvent) {
                         if (titleController.text.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -617,19 +651,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Widget _buildViewContent() {
     if (_viewMode == ViewMode.day) {
-      return ScheduleDayView(
-        day: _getDayName(_selectedDate.weekday),
-        schedules: _getSchedulesForDate(_selectedDate),
+      return GoogleCalendarDayView(
+        date: _selectedDate,
+        schedules: _schedules,
         courses: _courses,
         onDelete: _confirmDeleteSchedule,
-        onAdd: _showAddScheduleSheet,
+        onTap: (schedule) {
+          // Optional: Show schedule details
+          _showScheduleDetails(schedule);
+        },
       );
     } else if (_viewMode == ViewMode.week) {
-      return ScheduleWeekView(
+      return GoogleCalendarWeekView(
         startOfWeek: _startOfWeek,
         schedules: _schedules,
         courses: _courses,
         onDelete: _confirmDeleteSchedule,
+        onTap: (schedule) {
+          _showScheduleDetails(schedule);
+        },
       );
     } else {
       return ScheduleMonthView(
@@ -644,6 +684,309 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         },
       );
     }
+  }
+
+  void _showScheduleDetails(ClassScheduleModel schedule) {
+    final course = _courses[schedule.courseId];
+    final colorStr = course?.color ?? schedule.color ?? '3b82f6';
+    final color = Color(int.parse('0xFF$colorStr'));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurface : Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.textLight.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header with icon and title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    schedule.type == 'task'
+                        ? Icons.task_alt
+                        : schedule.type == 'course'
+                            ? Icons.school
+                            : Icons.event,
+                    color: color,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        schedule.courseName ?? course?.courseName ?? 'Event',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          schedule.type == 'task'
+                              ? 'Task'
+                              : schedule.type == 'course'
+                                  ? 'Course'
+                                  : 'Event',
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // Information Cards
+            _buildInfoCard(
+              icon: Icons.access_time,
+              iconColor: color,
+              title: 'Time',
+              value: '${schedule.startTime} - ${schedule.endTime}',
+              isDark: isDark,
+            ),
+
+            if (schedule.specificDate != null) ...[
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                icon: Icons.calendar_today,
+                iconColor: Colors.blue,
+                title: 'Date',
+                value: _formatDate(schedule.specificDate!),
+                isDark: isDark,
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                icon: Icons.repeat,
+                iconColor: Colors.purple,
+                title: 'Recurring',
+                value: 'Every ${schedule.dayOfWeek}',
+                isDark: isDark,
+              ),
+            ],
+
+            if (schedule.room != null) ...[
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                icon: Icons.location_on,
+                iconColor: Colors.red,
+                title: 'Location',
+                value: schedule.room!,
+                isDark: isDark,
+              ),
+            ],
+
+            if (course != null) ...[
+              if (course.instructor != null) ...[
+                const SizedBox(height: 12),
+                _buildInfoCard(
+                  icon: Icons.person,
+                  iconColor: Colors.green,
+                  title: 'Instructor',
+                  value: course.instructor!,
+                  isDark: isDark,
+                ),
+              ],
+              if (course.courseCode != null) ...[
+                const SizedBox(height: 12),
+                _buildInfoCard(
+                  icon: Icons.numbers,
+                  iconColor: Colors.orange,
+                  title: 'Course Code',
+                  value: course.courseCode!,
+                  isDark: isDark,
+                ),
+              ],
+              if (course.credits != null) ...[
+                const SizedBox(height: 12),
+                _buildInfoCard(
+                  icon: Icons.star,
+                  iconColor: Colors.amber,
+                  title: 'Credits',
+                  value: '${course.credits} SKS',
+                  isDark: isDark,
+                ),
+              ],
+            ],
+
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _confirmDeleteSchedule(schedule.id);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.urgent,
+                      side: const BorderSide(color: AppTheme.urgent),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    label: const Text('Delete'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.check, size: 20),
+                    label: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+
+            // Bottom padding for safe area
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.textLight.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textLight,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   String _getDayName(int weekday) {
@@ -664,71 +1007,320 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   void _showCreateCourseDialog() {
-    // Simple dialog to create a course quickly
     final nameController = TextEditingController();
-    final codeController = TextEditingController(); // Optional
+    final codeController = TextEditingController();
+    final instructorController = TextEditingController();
+    final roomController = TextEditingController();
+    final creditsController = TextEditingController();
 
-    showDialog(
+    String selectedColor = '3b82f6'; // Default blue
+
+    final colors = [
+      {'name': 'Blue', 'value': '3b82f6'},
+      {'name': 'Red', 'value': 'ef4444'},
+      {'name': 'Green', 'value': '10b981'},
+      {'name': 'Purple', 'value': '9c27b0'},
+      {'name': 'Orange', 'value': 'f97316'},
+      {'name': 'Pink', 'value': 'ec4899'},
+      {'name': 'Teal', 'value': '14b8a6'},
+      {'name': 'Indigo', 'value': '6366f1'},
+    ];
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create New Course'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Course Name'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: codeController,
-              decoration: const InputDecoration(
-                labelText: 'Course Code (Optional)',
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurface : Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty) return;
-              try {
-                // Create course with a random color or default
-                await CourseService.instance.createCourse(
-                  userId: widget.user['id'],
-                  courseName: nameController.text,
-                  courseCode: codeController.text.isNotEmpty
-                      ? codeController.text
-                      : 'GEN-${DateTime.now().millisecondsSinceEpoch}', // Generate simple code if empty
-                  color: '3b82f6', // Default blue
-                  instructor: '',
-                  room: '',
-                  description: '', // Service uses 'description' not 'notes'
-                );
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-                if (!mounted) return; // Ensure screen is mounted after pop
-                _loadSchedule(); // Reload to fetch new course
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              left: 24,
+              right: 24,
+              top: 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.textLight.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
 
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Course created')));
-              } catch (e) {
-                // Handle error
-                if (mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
+                  // Title
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.school,
+                          color: AppTheme.primary,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Create New Course',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Course Name
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Course Name *',
+                      hintText: 'e.g., Data Structures',
+                      prefixIcon: const Icon(Icons.book),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Course Code
+                  TextField(
+                    controller: codeController,
+                    decoration: InputDecoration(
+                      labelText: 'Course Code',
+                      hintText: 'e.g., CS202',
+                      prefixIcon: const Icon(Icons.numbers),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Instructor
+                  TextField(
+                    controller: instructorController,
+                    decoration: InputDecoration(
+                      labelText: 'Instructor',
+                      hintText: 'e.g., Dr. Smith',
+                      prefixIcon: const Icon(Icons.person),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Room & Credits Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: roomController,
+                          decoration: InputDecoration(
+                            labelText: 'Default Room',
+                            hintText: 'e.g., A216',
+                            prefixIcon: const Icon(Icons.location_on, size: 20),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: creditsController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Credits (SKS)',
+                            hintText: '3',
+                            prefixIcon: const Icon(Icons.star, size: 20),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Color Picker
+                  const Text(
+                    'Course Color',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: colors.map((colorData) {
+                      final colorValue = colorData['value']!;
+                      final color = Color(int.parse('0xFF$colorValue'));
+                      final isSelected = selectedColor == colorValue;
+
+                      return GestureDetector(
+                        onTap: () {
+                          setModalState(() => selectedColor = colorValue);
+                        },
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? Colors.white : Colors.transparent,
+                              width: 3,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    )
+                                  ]
+                                : [],
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 24,
+                                )
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Action Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (nameController.text.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Course name is required'),
+                                ),
+                              );
+                              return;
+                            }
+
+                            try {
+                              final courseCode = codeController.text.trim().isNotEmpty
+                                  ? codeController.text.trim()
+                                  : 'COURSE-${DateTime.now().millisecondsSinceEpoch}';
+
+                              await CourseService.instance.createCourse(
+                                userId: widget.user['id'],
+                                courseName: nameController.text.trim(),
+                                courseCode: courseCode,
+                                instructor: instructorController.text.trim().isNotEmpty
+                                    ? instructorController.text.trim()
+                                    : null,
+                                room: roomController.text.trim().isNotEmpty
+                                    ? roomController.text.trim()
+                                    : null,
+                                color: selectedColor,
+                              );
+
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+
+                              if (!mounted) return;
+                              _loadSchedule();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '✅ ${nameController.text} created successfully!',
+                                  ),
+                                  backgroundColor: AppTheme.primary,
+                                ),
+                              );
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: const Text(
+                            'Create Course',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
